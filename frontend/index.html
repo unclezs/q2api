@@ -2,394 +2,664 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"/>
-  <title>Amazonq2api 前端控制台 · 账号管理 + Chat 测试</title>
+  <title>Q2API 控制台</title>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <style>
     :root {
-      --bg:#0a0e1a;
-      --panel:#0f1420;
-      --muted:#8b95a8;
-      --text:#e8f0ff;
-      --accent:#4f8fff;
-      --danger:#ff4757;
-      --ok:#2ed573;
-      --warn:#ffa502;
-      --border:#1a2332;
-      --chip:#141b28;
-      --code:#0d1218;
-      --glow:rgba(79,143,255,.15);
+      --background: 0 0% 3.9%;
+      --foreground: 0 0% 98%;
+      --card: 0 0% 3.9%;
+      --card-foreground: 0 0% 98%;
+      --primary: 0 0% 98%;
+      --primary-foreground: 0 0% 9%;
+      --secondary: 0 0% 14.9%;
+      --secondary-foreground: 0 0% 98%;
+      --muted: 0 0% 14.9%;
+      --muted-foreground: 0 0% 63.9%;
+      --accent: 0 0% 14.9%;
+      --accent-foreground: 0 0% 98%;
+      --destructive: 0 62.8% 30.6%;
+      --destructive-foreground: 0 0% 98%;
+      --success: 142 71% 45%;
+      --warning: 38 92% 50%;
+      --border: 0 0% 14.9%;
+      --input: 0 0% 14.9%;
+      --ring: 0 0% 83.1%;
+      --radius: 0.5rem;
     }
-    * { box-sizing:border-box; }
-    html, body { height:100%; margin:0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      padding:0 0 40px;
-      background:radial-gradient(ellipse at top, #0f1624 0%, #0a0e1a 100%);
-      color:var(--text);
-      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Hiragino Sans GB,Microsoft YaHei,Noto Sans,Arial,sans-serif;
-      line-height:1.6;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    h1,h2,h3 { font-weight:700; letter-spacing:-.02em; margin:0; }
-    h1 { font-size:28px; margin:24px 0 12px; background:linear-gradient(135deg,#4f8fff,#7b9fff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    h2 { font-size:18px; margin:20px 0 16px; color:#c5d4ff; }
-    h3 { font-size:15px; margin:16px 0 10px; color:#a8b8d8; }
-    .container { max-width:1280px; margin:0 auto; padding:20px; }
-    .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-    @media(max-width:1024px){ .grid { grid-template-columns:1fr; } }
-    .panel {
-      background:linear-gradient(145deg,rgba(15,20,32,.8),rgba(10,14,26,.9));
-      border:1px solid var(--border);
-      border-radius:16px;
-      padding:24px;
-      box-shadow:0 20px 60px rgba(0,0,0,.4),0 0 0 1px rgba(79,143,255,.08),inset 0 1px 0 rgba(255,255,255,.03);
-      backdrop-filter:blur(12px);
-      transition:transform .2s,box-shadow .2s;
+    h1 { font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em; }
+    h2 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.025em; color: hsl(var(--foreground)); }
+    h3 { font-size: 1rem; font-weight: 500; color: hsl(var(--muted-foreground)); }
+    .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
     }
-    .panel:hover { transform:translateY(-2px); box-shadow:0 24px 70px rgba(0,0,0,.5),0 0 0 1px rgba(79,143,255,.12),inset 0 1px 0 rgba(255,255,255,.04); }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    label { color:var(--muted); font-size:13px; font-weight:500; letter-spacing:.01em; }
-    .field { display:flex; flex-direction:column; gap:8px; flex:1; min-width:200px; }
-    input,textarea,select {
-      background:rgba(12,16,28,.6);
-      color:var(--text);
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:12px 14px;
-      outline:none;
-      transition:all .2s;
-      font-size:14px;
-      box-shadow:inset 0 1px 2px rgba(0,0,0,.2);
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: hsl(var(--foreground));
+      border-radius: 10px;
     }
-    input:focus,textarea:focus,select:focus {
-      border-color:var(--accent);
-      box-shadow:0 0 0 3px var(--glow),inset 0 1px 2px rgba(0,0,0,.2);
-      background:rgba(12,16,28,.8);
-    }
-    textarea { min-height:140px; resize:vertical; font-family:ui-monospace,monospace; }
-    button {
-      background:linear-gradient(135deg,#2563eb,#1e40af);
-      color:#fff;
-      border:none;
-      border-radius:12px;
-      padding:12px 20px;
-      font-weight:600;
-      font-size:14px;
-      cursor:pointer;
-      transition:all .2s;
-      box-shadow:0 4px 16px rgba(37,99,235,.3),inset 0 1px 0 rgba(255,255,255,.1);
-      position:relative;
-      overflow:hidden;
-    }
-    button:before {
-      content:'';
-      position:absolute;
-      top:0;left:0;right:0;bottom:0;
-      background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);
-      opacity:0;
-      transition:opacity .2s;
-    }
-    button:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(37,99,235,.4),inset 0 1px 0 rgba(255,255,255,.15); }
-    button:hover:before { opacity:1; }
-    button:active { transform:translateY(0); }
-    button:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-    .btn-secondary { background:linear-gradient(135deg,#1e293b,#0f172a); box-shadow:0 4px 16px rgba(15,23,42,.3),inset 0 1px 0 rgba(255,255,255,.05); }
-    .btn-secondary:hover { box-shadow:0 6px 20px rgba(15,23,42,.4),inset 0 1px 0 rgba(255,255,255,.08); }
-    .btn-danger { background:linear-gradient(135deg,#dc2626,#991b1b); box-shadow:0 4px 16px rgba(220,38,38,.3),inset 0 1px 0 rgba(255,255,255,.1); }
-    .btn-danger:hover { box-shadow:0 6px 20px rgba(220,38,38,.4),inset 0 1px 0 rgba(255,255,255,.15); }
-    .btn-warn { background:linear-gradient(135deg,#f59e0b,#d97706); box-shadow:0 4px 16px rgba(245,158,11,.3),inset 0 1px 0 rgba(255,255,255,.1); }
-    .btn-warn:hover { box-shadow:0 6px 20px rgba(245,158,11,.4),inset 0 1px 0 rgba(255,255,255,.15); }
-    .kvs { display:grid; grid-template-columns:160px 1fr; gap:10px 16px; font-size:13px; }
-    .muted { color:var(--muted); }
-    .chip {
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding:6px 12px;
-      background:rgba(20,27,40,.8);
-      border:1px solid var(--border);
-      border-radius:20px;
-      color:#a8b8ff;
-      font-size:12px;
-      font-weight:500;
-      box-shadow:0 2px 8px rgba(0,0,0,.2);
-    }
-    .list { position:relative; max-height:600px; overflow:auto; padding:2px; }
-    .list::-webkit-scrollbar { width:8px; }
-    .list::-webkit-scrollbar-track { background:rgba(0,0,0,.2); border-radius:4px; }
-    .list::-webkit-scrollbar-thumb { background:rgba(79,143,255,.3); border-radius:4px; }
-    .list::-webkit-scrollbar-thumb:hover { background:rgba(79,143,255,.5); }
-    .list-viewport { position:relative; }
-    .list-content { display:flex; flex-direction:column; gap:12px; }
+    .logo svg { width: 20px; height: 20px; }
+    .logo svg circle, .logo svg path { stroke: hsl(var(--background)); }
+    .logo svg text { fill: hsl(var(--background)); }
+    .header-title { font-size: 1.5rem; font-weight: 600; }
     .card {
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:16px;
-      background:linear-gradient(145deg,rgba(12,19,34,.6),rgba(10,14,26,.8));
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      box-shadow:0 4px 16px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.02);
-      transition:all .2s;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1rem;
     }
-    .card:hover { border-color:rgba(79,143,255,.3); box-shadow:0 6px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.03); }
-    .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+    .card-header { margin-bottom: 1rem; }
+    .card-title { font-size: 1.125rem; font-weight: 600; }
+    .card-description { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin-top: 0.25rem; }
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      background: hsl(var(--muted));
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+      width: fit-content;
+    }
+    .tab {
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: none;
+      border-radius: calc(var(--radius) - 2px);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab:hover { color: hsl(var(--foreground)); }
+    .tab.active {
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 200px; }
+    .form-group-sm { max-width: 200px; }
+    label { font-size: 0.875rem; font-weight: 500; color: hsl(var(--foreground)); }
+    .label-muted { color: hsl(var(--muted-foreground)); font-weight: 400; }
+    input, textarea, select {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      background: transparent;
+      border: 1px solid hsl(var(--input));
+      border-radius: calc(var(--radius) - 2px);
+      color: hsl(var(--foreground));
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground)); }
+    input:focus, textarea:focus, select:focus {
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    }
+    textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, monospace; }
+    select { cursor: pointer; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      border: none;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+    .btn-secondary:hover { background: hsl(0 0% 20%); }
+    .btn-destructive { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+    .btn-destructive:hover { opacity: 0.9; }
+    .btn-warning { background: hsl(var(--warning)); color: hsl(0 0% 9%); }
+    .btn-warning:hover { opacity: 0.9; }
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.625rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      border-radius: 9999px;
+      background: hsl(var(--secondary));
+      color: hsl(var(--secondary-foreground));
+    }
+    .badge-success { background: hsl(var(--success) / 0.2); color: hsl(var(--success)); }
+    .badge-destructive { background: hsl(var(--destructive) / 0.2); color: hsl(0 62.8% 50%); }
+    .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: hsl(var(--input));
+      transition: 0.2s;
+      border-radius: 9999px;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background: white;
+      transition: 0.2s;
+      border-radius: 50%;
+    }
+    input:checked + .switch-slider { background: hsl(var(--foreground)); }
+    input:checked + .switch-slider:before { transform: translateX(16px); background: hsl(var(--background)); }
+    .list { max-height: 70vh; overflow: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+    .list::-webkit-scrollbar { width: 6px; }
+    .list::-webkit-scrollbar-track { background: transparent; }
+    .list::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+    .account-card {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      background: hsl(var(--card));
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .account-card:hover { border-color: hsl(var(--ring)); background: hsl(var(--muted) / 0.5); }
+    .account-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 1rem; }
+    .account-name-group { display: flex; align-items: center; gap: 0.5rem; min-width: 200px; }
+    .account-name { font-weight: 500; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+    .account-id {
+      font-family: ui-monospace, monospace;
+      font-size: 0.7rem;
+      color: hsl(var(--muted-foreground));
+      background: hsl(var(--muted));
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+    }
+    .account-stats {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .stat-item { display: flex; align-items: center; gap: 0.375rem; }
+    .stat-value { color: hsl(var(--foreground)); font-family: ui-monospace, monospace; font-weight: 500; }
+    .stat-value.success { color: hsl(var(--success)); }
+    .stat-value.error { color: hsl(0 62.8% 50%); }
+    .stat-value.status { color: hsl(var(--muted-foreground)); }
+    .stat-value.usage { color: hsl(var(--warning)); }
+    .account-actions {
+      display: flex;
+      gap: 0.375rem;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 6px;
+      background: hsl(var(--secondary));
+      color: hsl(var(--secondary-foreground));
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-icon:hover { background: hsl(0 0% 20%); }
+    .btn-icon.danger:hover { background: hsl(var(--destructive)); }
+    .btn-icon.warning:hover { background: hsl(var(--warning)); color: hsl(0 0% 9%); }
+    .btn-icon svg { width: 14px; height: 14px; }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 0.75rem;
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .toolbar-left { display: flex; align-items: center; gap: 0.5rem; }
+    .toolbar-title { font-weight: 600; font-size: 0.9rem; }
+    .toolbar-count { font-size: 0.8rem; color: hsl(var(--muted-foreground)); }
+    .toolbar-divider { color: hsl(var(--border)); }
+    .toolbar-usage { font-size: 0.8rem; color: hsl(var(--warning)); font-family: ui-monospace, monospace; }
+    .toolbar-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .toolbar-select {
+      width: auto;
+      padding: 0.35rem 0.5rem;
+      font-size: 0.75rem;
+      background: hsl(var(--secondary));
+      border: none;
+    }
     .code {
-      background:var(--code);
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:14px;
-      color:#d8e8ff;
-      max-height:300px;
-      overflow:auto;
-      white-space:pre-wrap;
-      font-size:13px;
-      line-height:1.6;
-      box-shadow:inset 0 2px 4px rgba(0,0,0,.3);
+      background: hsl(0 0% 6%);
+      border: 1px solid hsl(var(--border));
+      border-radius: calc(var(--radius) - 2px);
+      padding: 1rem;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      max-height: 300px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
-    .code::-webkit-scrollbar { width:8px; height:8px; }
-    .code::-webkit-scrollbar-track { background:rgba(0,0,0,.2); border-radius:4px; }
-    .code::-webkit-scrollbar-thumb { background:rgba(79,143,255,.3); border-radius:4px; }
-    .right { margin-left:auto; }
-    .sep { height:1px; background:linear-gradient(90deg,transparent,rgba(79,143,255,.2),transparent); margin:16px 0; }
-    .status-ok { color:var(--ok); font-weight:600; }
-    .status-fail { color:var(--danger); font-weight:600; }
-    .switch { position:relative; display:inline-block; width:50px; height:26px; }
-    .switch input { opacity:0; width:0; height:0; }
-    .slider {
-      position:absolute;
-      cursor:pointer;
-      top:0;left:0;right:0;bottom:0;
-      background:linear-gradient(135deg,#374151,#1f2937);
-      transition:.3s;
-      border-radius:26px;
-      border:1px solid var(--border);
-      box-shadow:inset 0 2px 4px rgba(0,0,0,.3);
+    .filter-row {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid hsl(var(--border));
     }
-    .slider:before {
-      position:absolute;
-      content:"";
-      height:20px;
-      width:20px;
-      left:3px;
-      bottom:2px;
-      background:linear-gradient(135deg,#f3f4f6,#e5e7eb);
-      transition:.3s;
-      border-radius:50%;
-      box-shadow:0 2px 6px rgba(0,0,0,.3);
+    .filter-group { display: flex; gap: 0.5rem; align-items: center; }
+    .filter-group label { font-size: 0.875rem; color: hsl(var(--muted-foreground)); }
+    .radio-group { display: flex; gap: 0.5rem; }
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      cursor: pointer;
+      transition: color 0.15s;
     }
-    input:checked+.slider { background:linear-gradient(135deg,#3b82f6,#2563eb); box-shadow:0 0 12px rgba(59,130,246,.4),inset 0 2px 4px rgba(0,0,0,.2); }
-    input:checked+.slider:before { transform:translateX(24px); }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-    .panel { animation:fadeIn .4s ease-out; }
-    .tabs { display:flex; gap:8px; margin:20px 0 16px; border-bottom:2px solid var(--border); }
-    .tab { padding:12px 24px; background:transparent; border:none; color:var(--muted); font-weight:600; font-size:14px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .2s; }
-    .tab:hover { color:var(--text); background:rgba(79,143,255,.05); }
-    .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
-    .tab-content { display:none; }
-    .tab-content.active { display:block; }
+    .radio-label:hover { color: hsl(var(--foreground)); }
+    .radio-label:has(input:checked) { color: hsl(var(--foreground)); }
+    .radio-label input[type="radio"] { width: 14px; height: 14px; accent-color: hsl(var(--primary)); }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      max-width: 800px;
+      max-height: 80vh;
+      overflow: auto;
+      width: 100%;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+      position: sticky;
+      top: 0;
+      background: hsl(var(--card));
+      z-index: 1;
+    }
+    .modal-title { font-size: 1.125rem; font-weight: 600; }
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: hsl(var(--muted-foreground));
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.25rem;
+      line-height: 1;
+    }
+    .modal-close:hover { color: hsl(var(--foreground)); }
+    .modal-body { padding: 1.5rem; }
+    .import-section {
+      background: hsl(var(--muted) / 0.5);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .import-label { font-weight: 600; font-size: 0.875rem; display: block; margin-bottom: 0.25rem; }
+    .import-files { display: flex; flex-direction: column; gap: 0.75rem; }
+    .file-input-wrap { display: flex; flex-direction: column; gap: 0.25rem; }
+    .file-label { font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+    .file-input-wrap input[type="file"] {
+      font-size: 0.75rem;
+      padding: 0.5rem;
+      background: hsl(var(--background));
+      border: 1px dashed hsl(var(--border));
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+    }
+    .file-input-wrap input[type="file"]:hover { border-color: hsl(var(--primary)); }
+    .form-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1rem 0;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.75rem;
+    }
+    .form-divider::before, .form-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: hsl(var(--border));
+    }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-2 { gap: 0.5rem; }
+    .ml-auto { margin-left: auto; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-4 { margin-top: 1rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .text-muted { color: hsl(var(--muted-foreground)); }
+    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 0.75rem; }
+    .text-success { color: hsl(142 76% 46%); }
+    .text-destructive { color: hsl(0 62.8% 50%); }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fadeIn 0.3s ease-out; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Q2api 前端控制台</h1>
+    <div class="header">
+      <span class="header-title">Q2API</span>
+    </div>
 
     <div class="tabs">
       <button class="tab active" onclick="switchTab('accounts')">账号管理</button>
-      <button class="tab" onclick="switchTab('create')">创建账号</button>
       <button class="tab" onclick="switchTab('login')">URL登录</button>
-      <button class="tab" onclick="switchTab('chat')">Chat测试</button>
+      <button class="tab" onclick="switchTab('chat')">对话测试</button>
     </div>
 
-    <div id="tab-accounts" class="tab-content active">
-      <div class="panel">
-        <h2>账号管理 <span id="accountCount" style="font-size: 0.8em; color: #666;"></span></h2>
-        <div class="row">
-          <button class="btn-secondary" onclick="loadAccounts()">刷新列表</button>
-          <button class="btn-secondary" onclick="queryUsage()" id="usageBtn">查询启用总使用量</button>
-          <div style="margin-left: 20px;">
-            <label><input type="radio" name="accountFilter" value="all" checked onchange="loadAccounts()"> 全部</label>
-            <label style="margin-left: 10px;"><input type="radio" name="accountFilter" value="enabled" onchange="loadAccounts()"> 已启用</label>
-            <label style="margin-left: 10px;"><input type="radio" name="accountFilter" value="disabled" onchange="loadAccounts()"> 已禁用</label>
+    <div id="tab-accounts" class="tab-content active animate-in">
+      <div class="card">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <span class="toolbar-title">账号列表</span>
+            <span id="accountCount" class="toolbar-count"></span>
+            <span class="toolbar-divider">|</span>
+            <span class="toolbar-usage" id="totalUsage">总用量: -</span>
           </div>
-          <div style="margin-left: 20px;">
-            <label>排序：
-              <select id="sortBy" onchange="loadAccounts()">
-                <option value="created_at">创建日期</option>
-                <option value="success_count">成功次数</option>
-              </select>
-            </label>
-            <label style="margin-left: 10px;">
-              <select id="sortOrder" onchange="loadAccounts()">
-                <option value="desc">降序</option>
-                <option value="asc">升序</option>
-              </select>
-            </label>
+          <div class="toolbar-right">
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="accountFilter" value="all" checked onchange="loadAccounts()"> 全部</label>
+              <label class="radio-label"><input type="radio" name="accountFilter" value="enabled" onchange="loadAccounts()"> 启用</label>
+              <label class="radio-label"><input type="radio" name="accountFilter" value="disabled" onchange="loadAccounts()"> 禁用</label>
+            </div>
+            <select id="sortBy" onchange="loadAccounts()" class="toolbar-select">
+              <option value="created_at">创建时间</option>
+              <option value="success_count">成功次数</option>
+            </select>
+            <select id="sortOrder" onchange="loadAccounts()" class="toolbar-select">
+              <option value="desc">降序</option>
+              <option value="asc">升序</option>
+            </select>
+            <button class="btn-icon" onclick="loadAccounts()" title="刷新列表">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="loadAllUsage()" id="usageBtn">刷新用量</button>
+            <button class="btn btn-primary btn-sm" onclick="showAddAccountModal()">添加账号</button>
           </div>
         </div>
         <div class="list" id="accounts"></div>
       </div>
     </div>
 
-    <div id="tab-create" class="tab-content">
-      <div class="panel">
-        <h2>创建账号</h2>
-        <div class="row">
-          <div class="field"><label>label</label><input id="new_label" /></div>
-          <div class="field"><label>clientId</label><input id="new_clientId" /></div>
-          <div class="field"><label>clientSecret</label><input id="new_clientSecret" /></div>
-        </div>
-        <div class="row">
-          <div class="field"><label>refreshToken</label><input id="new_refreshToken" /></div>
-          <div class="field"><label>accessToken</label><input id="new_accessToken" /></div>
-        </div>
-        <div class="row">
-          <div class="field">
-            <label>other（JSON，可选）</label>
-            <textarea id="new_other" placeholder='{"note":"备注"}'></textarea>
-          </div>
-          <div class="field" style="max-width:220px">
-            <label>启用（仅启用账号会被用于请求）</label>
-            <div>
-              <label class="switch">
-                <input id="new_enabled" type="checkbox" checked />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div class="row">
-          <button onclick="createAccount()">创建</button>
-        </div>
-      </div>
-    </div>
-
     <div id="tab-login" class="tab-content">
-      <div class="panel">
-        <h2>URL 登录（5分钟超时）</h2>
-        <div class="row">
-          <div class="field"><label>label（可选）</label><input id="auth_label" /></div>
-          <div class="field" style="max-width:220px">
-            <label>启用（登录成功后新账号是否启用）</label>
-            <div>
+      <div class="card animate-in">
+        <div class="card-header">
+          <h2 class="card-title">URL 登录</h2>
+          <p class="card-description">设备授权流程（5分钟超时）</p>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>标签（可选）</label><input id="auth_label" placeholder="账号标签" /></div>
+          <div class="form-group form-group-sm">
+            <label>成功后启用</label>
+            <div class="mt-2">
               <label class="switch">
                 <input id="auth_enabled" type="checkbox" checked />
-                <span class="slider"></span>
+                <span class="switch-slider"></span>
               </label>
             </div>
           </div>
         </div>
-        <div class="row">
-          <button onclick="startAuth()">开始登录</button>
-          <button class="btn-secondary" onclick="claimAuth()">等待授权并创建账号</button>
+        <div class="form-row">
+          <button class="btn btn-primary" onclick="startAuth()">开始登录</button>
+          <button class="btn btn-secondary" onclick="claimAuth()">等待授权</button>
         </div>
-        <div class="field">
+        <div class="form-group mt-4">
           <label>登录信息</label>
-          <pre class="code mono" id="auth_info">尚未开始</pre>
+          <pre class="code" id="auth_info">尚未开始</pre>
         </div>
       </div>
     </div>
 
     <div id="tab-chat" class="tab-content">
-      <div class="panel">
-        <h2>Chat 测试（OpenAI 兼容 /v1/chat/completions）</h2>
-        <div class="row">
-          <div class="field" style="max-width:300px">
-            <label>model</label>
+      <div class="card animate-in">
+        <div class="card-header">
+          <h2 class="card-title">对话测试</h2>
+          <p class="card-description">OpenAI 兼容接口 /v1/chat/completions</p>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="max-width:300px">
+            <label>模型</label>
             <input id="model" value="claude-sonnet-4" />
           </div>
-          <div class="field" style="max-width:180px">
-            <label>是否流式</label>
+          <div class="form-group" style="max-width:150px">
+            <label>流式</label>
             <select id="stream">
-              <option value="false">false（默认）</option>
-              <option value="true">true（SSE）</option>
+              <option value="false">否</option>
+              <option value="true">是 (SSE)</option>
             </select>
           </div>
-          <button class="right" onclick="send()">发送请求</button>
+          <button class="btn btn-primary ml-auto" style="align-self:flex-end" onclick="send()">发送请求</button>
         </div>
-        <div class="field">
-          <label>messages（JSON）</label>
+        <div class="form-group">
+          <label>消息 (JSON)</label>
           <textarea id="messages">[
   {"role":"system","content":"你是一个乐于助人的助手"},
   {"role":"user","content":"你好，请讲一个简短的故事"}
 ]</textarea>
         </div>
-        <div class="field">
+        <div class="form-group">
           <label>响应</label>
-          <pre class="code mono" id="out"></pre>
+          <pre class="code" id="out"></pre>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- 添加账号弹窗 -->
+  <div id="addAccountModal" class="modal-overlay" style="display:none">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <h3 class="modal-title">添加账号</h3>
+        <button class="modal-close" onclick="hideAddAccountModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="import-section">
+          <label class="import-label">从文件导入</label>
+          <p class="text-xs text-muted mb-2">选择 AWS SSO 缓存目录下的两个 JSON 文件自动解析</p>
+          <div class="import-files">
+            <div class="file-input-wrap">
+              <label class="file-label">Token 文件 (kiro-auth-token.json)</label>
+              <input type="file" id="importTokenFile" accept=".json" onchange="parseTokenFile(this)">
+            </div>
+            <div class="file-input-wrap">
+              <label class="file-label">Client 文件 (*.json)</label>
+              <input type="file" id="importClientFile" accept=".json" onchange="parseClientFile(this)">
+            </div>
+          </div>
+        </div>
+        <div class="form-divider"><span>或手动填写</span></div>
+        <div class="form-group mb-2">
+          <label>标签</label>
+          <input id="new_label" placeholder="可选标签" />
+        </div>
+        <div class="form-group mb-2">
+          <label>Client ID</label>
+          <input id="new_clientId" placeholder="必填" />
+        </div>
+        <div class="form-group mb-2">
+          <label>Client Secret</label>
+          <input id="new_clientSecret" placeholder="必填" type="password" />
+        </div>
+        <div class="form-group mb-2">
+          <label>Refresh Token</label>
+          <input id="new_refreshToken" placeholder="必填" />
+        </div>
+        <div class="form-group mb-2">
+          <label>Access Token</label>
+          <input id="new_accessToken" placeholder="可选" />
+        </div>
+        <div class="form-row" style="margin-top:1rem">
+          <label class="switch">
+            <input id="new_enabled" type="checkbox" checked />
+            <span class="switch-slider"></span>
+          </label>
+          <span class="text-sm">创建后启用</span>
+          <button class="btn btn-primary ml-auto" onclick="createAccount()">创建</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <script>
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   event.target.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
+  const content = document.getElementById('tab-' + name);
+  content.classList.add('active');
+  content.classList.add('animate-in');
 }
 
-function api(path){
-  const pathClean = ('/' + (path || '').replace(/^\/+/, '')).replace(/\/{2,}/g, '/');
-  return pathClean;
+function api(path) {
+  return ('/' + (path || '').replace(/^\/+/, '')).replace(/\/{2,}/g, '/');
 }
 
-// Authentication helpers
 function getAuthPassword() {
   return localStorage.getItem('adminPassword');
 }
 
 function getAuthHeaders() {
   const password = getAuthPassword();
-  if (!password) return {};
-  return { 'Authorization': `Bearer ${password}` };
+  return password ? { 'Authorization': `Bearer ${password}` } : {};
 }
 
-// Authenticated fetch wrapper
 async function authFetch(url, options = {}) {
   const headers = { ...getAuthHeaders(), ...options.headers };
   const response = await fetch(url, { ...options, headers });
-
   if (response.status === 401) {
     localStorage.removeItem('adminPassword');
     window.location.href = '/login';
-    throw new Error('Unauthorized');
+    throw new Error('未授权');
   }
-
   return response;
 }
 
-// Check authentication on page load - removed, combined with loadAccounts below
-
-// Virtual scroll state
 let accountsData = [];
-let virtualScroll = null;
 
-// Create account card element
 function createAccountCard(acc) {
   const card = document.createElement('div');
-  card.className = 'card';
+  card.className = 'account-card';
   card.dataset.accountId = acc.id;
 
-  const header = document.createElement('div');
-  header.className = 'row';
-  const name = document.createElement('div');
-  name.innerHTML = '<strong>' + (acc.label || '(无标签)') + '</strong>';
-  const id = document.createElement('div');
-  id.className = 'chip mono';
-  id.textContent = acc.id;
+  // 左侧信息区
+  const info = document.createElement('div');
+  info.className = 'account-info';
 
-  const spacer = document.createElement('div');
-  spacer.className = 'right';
+  // 名称和ID组
+  const nameGroup = document.createElement('div');
+  nameGroup.className = 'account-name-group';
 
-  // Enabled toggle
-  const toggleWrap = document.createElement('div');
-  const toggleLabel = document.createElement('label');
-  toggleLabel.style.marginRight = '6px';
-  toggleLabel.className = 'muted';
-  toggleLabel.textContent = '启用';
+  const name = document.createElement('span');
+  name.className = 'account-name';
+  name.textContent = acc.label || '(无标签)';
+  name.title = acc.label || '';
+
+  const id = document.createElement('span');
+  id.className = 'account-id';
+  id.textContent = acc.id.slice(0, 8);
+  id.title = acc.id;
+
+  nameGroup.appendChild(name);
+  nameGroup.appendChild(id);
+
+  // 统计信息
+  const stats = document.createElement('div');
+  stats.className = 'account-stats';
+
+  const successStat = document.createElement('div');
+  successStat.className = 'stat-item';
+  successStat.innerHTML = `<span>成功</span><span class="stat-value success">${acc.success_count ?? 0}</span>`;
+
+  const errorStat = document.createElement('div');
+  errorStat.className = 'stat-item';
+  errorStat.innerHTML = `<span>错误</span><span class="stat-value ${(acc.error_count ?? 0) > 0 ? 'error' : ''}">${acc.error_count ?? 0}</span>`;
+
+  const statusStat = document.createElement('div');
+  statusStat.className = 'stat-item';
+  statusStat.innerHTML = `<span>状态</span><span class="stat-value status">${acc.last_refresh_status || '-'}</span>`;
+
+  const usageStat = document.createElement('div');
+  usageStat.className = 'stat-item';
+  usageStat.id = `usage-${acc.id}`;
+  usageStat.innerHTML = `<span>用量</span><span class="stat-value usage">-</span>`;
+
+  stats.appendChild(successStat);
+  stats.appendChild(errorStat);
+  stats.appendChild(statusStat);
+  stats.appendChild(usageStat);
+
+  info.appendChild(nameGroup);
+  info.appendChild(stats);
+
+  // 右侧操作区
+  const actions = document.createElement('div');
+  actions.className = 'account-actions';
+
+  // 开关
   const toggle = document.createElement('label');
   toggle.className = 'switch';
+  toggle.title = acc.enabled ? '点击禁用' : '点击启用';
   const chk = document.createElement('input');
   chk.type = 'checkbox';
   chk.checked = !!acc.enabled;
@@ -401,259 +671,53 @@ function createAccountCard(acc) {
     }
   };
   const slider = document.createElement('span');
-  slider.className = 'slider';
-  toggle.appendChild(chk); toggle.appendChild(slider);
-  toggleWrap.appendChild(toggleLabel); toggleWrap.appendChild(toggle);
+  slider.className = 'switch-slider';
+  toggle.appendChild(chk);
+  toggle.appendChild(slider);
 
-  const usageBtn = document.createElement('button');
-  usageBtn.className = 'btn-secondary';
-  usageBtn.textContent = '查询用量';
-  usageBtn.onclick = () => querySingleUsage(acc.id, acc.label);
-
+  // 刷新按钮
   const refreshBtn = document.createElement('button');
-  refreshBtn.className = 'btn-warn';
-  refreshBtn.textContent = '刷新Token';
+  refreshBtn.className = 'btn-icon warning';
+  refreshBtn.title = '刷新Token';
+  refreshBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>';
   refreshBtn.onclick = () => refreshAccount(acc.id);
 
+  // 删除按钮
   const delBtn = document.createElement('button');
-  delBtn.className = 'btn-danger';
-  delBtn.textContent = '删除';
+  delBtn.className = 'btn-icon danger';
+  delBtn.title = '删除账号';
+  delBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
   delBtn.onclick = () => deleteAccount(acc.id);
 
-  header.appendChild(name);
-  header.appendChild(id);
-  header.appendChild(spacer);
-  header.appendChild(toggleWrap);
-  header.appendChild(usageBtn);
-  header.appendChild(refreshBtn);
-  header.appendChild(delBtn);
-  card.appendChild(header);
+  actions.appendChild(toggle);
+  actions.appendChild(refreshBtn);
+  actions.appendChild(delBtn);
 
-  const meta = document.createElement('div');
-  meta.className = 'kvs mono';
-  function row(k, v) {
-    const kEl = document.createElement('div'); kEl.className = 'muted'; kEl.textContent = k;
-    const vEl = document.createElement('div'); vEl.textContent = v ?? '';
-    meta.appendChild(kEl); meta.appendChild(vEl);
-  }
-  row('enabled', String(!!acc.enabled));
-  row('success_count', acc.success_count ?? 0);
-  row('error_count', acc.error_count ?? 0);
-  row('last_refresh_status', acc.last_refresh_status);
-  row('last_refresh_time', acc.last_refresh_time);
-  row('clientId', acc.clientId);
-  row('hasRefreshToken', acc.refreshToken ? 'yes' : 'no');
-  row('hasAccessToken', acc.accessToken ? 'yes' : 'no');
-  row('created_at', acc.created_at);
-  row('updated_at', acc.updated_at);
-  if (acc.other) {
-    row('other', JSON.stringify(acc.other));
-  }
-  card.appendChild(meta);
-
-  // quick edit form
-  const editRow = document.createElement('div');
-  editRow.className = 'row';
-  editRow.style.marginTop = '8px';
-  const labelField = document.createElement('input');
-  labelField.placeholder = 'label';
-  labelField.value = acc.label || '';
-  const accessField = document.createElement('input');
-  accessField.placeholder = 'accessToken（可选）';
-  accessField.value = acc.accessToken || '';
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'btn-secondary';
-  saveBtn.textContent = '保存';
-  saveBtn.onclick = async () => {
-    await updateAccount(acc.id, { label: labelField.value, accessToken: accessField.value });
-  };
-  editRow.appendChild(labelField);
-  editRow.appendChild(accessField);
-  editRow.appendChild(saveBtn);
-  card.appendChild(editRow);
+  card.appendChild(info);
+  card.appendChild(actions);
 
   return card;
 }
 
-// Virtual scroll implementation with auto height adjustment
-class VirtualScroll {
-  constructor(container, items, itemHeight, bufferSize = 3) {
-    this.container = container;
-    this.items = items;
-    this.itemHeight = itemHeight;
-    this.bufferSize = bufferSize;
-    this.visibleStart = 0;
-    this.visibleEnd = 0;
-    this.renderedItems = new Map();
-    this.measuredHeights = new Map();
-    this.heightAdjusted = false;
-    
-    this.viewport = document.createElement('div');
-    this.viewport.className = 'list-viewport';
-    this.content = document.createElement('div');
-    this.content.className = 'list-content';
-    this.viewport.appendChild(this.content);
-    
-    this.container.innerHTML = '';
-    this.container.appendChild(this.viewport);
-    
-    this.container.addEventListener('scroll', () => this.onScroll());
-    this.render();
-    
-    // Auto-measure after first render
-    requestAnimationFrame(() => this.measureAndAdjust());
-  }
-  
-  onScroll() {
-    requestAnimationFrame(() => this.render());
-  }
-  
-  measureAndAdjust() {
-    let maxHeight = 0;
-    let needsAdjustment = false;
-    
-    // Measure all currently rendered items
-    for (const [idx, element] of this.renderedItems.entries()) {
-      const rect = element.getBoundingClientRect();
-      const actualHeight = rect.height + 12; // +12 for gap
-      this.measuredHeights.set(idx, actualHeight);
-      
-      if (actualHeight > maxHeight) {
-        maxHeight = actualHeight;
-      }
-      
-      // Check if actual height exceeds estimated height
-      if (actualHeight > this.itemHeight * 0.95) {
-        needsAdjustment = true;
-      }
-    }
-    
-    // Auto-adjust if needed
-    if (needsAdjustment && maxHeight > this.itemHeight) {
-      console.log(`[VirtualScroll] 检测到重影，调整高度: ${this.itemHeight}px -> ${Math.ceil(maxHeight)}px`);
-      this.itemHeight = Math.ceil(maxHeight);
-      this.heightAdjusted = true;
-      
-      // Re-render with new height
-      this.reposition();
-    }
-  }
-  
-  reposition() {
-    // Reposition all rendered items with new height
-    for (const [idx, element] of this.renderedItems.entries()) {
-      element.style.top = (idx * this.itemHeight) + 'px';
-    }
-    
-    // Update viewport height
-    this.viewport.style.height = (this.items.length * this.itemHeight) + 'px';
-  }
-  
-  render() {
-    const scrollTop = this.container.scrollTop;
-    const containerHeight = this.container.clientHeight;
-    
-    const start = Math.floor(scrollTop / this.itemHeight);
-    const end = Math.ceil((scrollTop + containerHeight) / this.itemHeight);
-    
-    const bufferedStart = Math.max(0, start - this.bufferSize);
-    const bufferedEnd = Math.min(this.items.length, end + this.bufferSize);
-    
-    if (bufferedStart === this.visibleStart && bufferedEnd === this.visibleEnd) {
-      return;
-    }
-    
-    this.visibleStart = bufferedStart;
-    this.visibleEnd = bufferedEnd;
-    
-    // Set viewport height
-    this.viewport.style.height = (this.items.length * this.itemHeight) + 'px';
-    
-    // Remove items outside visible range
-    for (const [idx, element] of this.renderedItems.entries()) {
-      if (idx < bufferedStart || idx >= bufferedEnd) {
-        element.remove();
-        this.renderedItems.delete(idx);
-      }
-    }
-    
-    // Add items in visible range
-    const fragment = document.createDocumentFragment();
-    let newItemsAdded = false;
-    
-    for (let i = bufferedStart; i < bufferedEnd; i++) {
-      if (!this.renderedItems.has(i)) {
-        const item = createAccountCard(this.items[i]);
-        item.style.position = 'absolute';
-        item.style.top = (i * this.itemHeight) + 'px';
-        item.style.left = '0';
-        item.style.right = '0';
-        this.renderedItems.set(i, item);
-        fragment.appendChild(item);
-        newItemsAdded = true;
-      }
-    }
-    
-    if (fragment.childNodes.length > 0) {
-      this.content.appendChild(fragment);
-      
-      // Measure new items after they're added to DOM
-      if (newItemsAdded && !this.heightAdjusted) {
-        requestAnimationFrame(() => this.measureAndAdjust());
-      }
-    }
-  }
-  
-  update(items) {
-    this.items = items;
-    this.renderedItems.clear();
-    this.measuredHeights.clear();
-    this.heightAdjusted = false;
-    this.content.innerHTML = '';
-    this.visibleStart = -1; // Force re-render
-    this.visibleEnd = -1;
-    requestAnimationFrame(() => {
-      this.render();
-      this.measureAndAdjust();
-    });
-  }
-  
-  destroy() {
-    this.container.removeEventListener('scroll', this.onScroll);
-    this.renderedItems.clear();
-    this.measuredHeights.clear();
-  }
-}
-
-function renderAccounts(list){
+function renderAccounts(list) {
   accountsData = list;
   const root = document.getElementById('accounts');
-  
+  root.innerHTML = '';
+
   if (!Array.isArray(list) || list.length === 0) {
-    if (virtualScroll) {
-      virtualScroll.destroy();
-      virtualScroll = null;
-    }
-    root.innerHTML = '';
-    const empty = document.createElement('div');
-    empty.className = 'muted';
-    empty.textContent = '暂无账号';
-    root.appendChild(empty);
+    root.innerHTML = '<div class="text-muted text-sm" style="padding:2rem;text-align:center;">暂无账号</div>';
     return;
   }
-  
-  // Estimate item height (card height ~280px with gap)
-  const estimatedItemHeight = 292;
-  
-  if (virtualScroll) {
-    virtualScroll.update(list);
-  } else {
-    virtualScroll = new VirtualScroll(root, list, estimatedItemHeight);
+
+  const fragment = document.createDocumentFragment();
+  for (const acc of list) {
+    fragment.appendChild(createAccountCard(acc));
   }
+  root.appendChild(fragment);
 }
 
-async function loadAccounts(){
-  try{
+async function loadAccounts(autoRefreshUsage = true) {
+  try {
     const filter = document.querySelector('input[name="accountFilter"]:checked')?.value || 'all';
     const sortBy = document.getElementById('sortBy')?.value || 'created_at';
     const sortOrder = document.getElementById('sortOrder')?.value || 'desc';
@@ -666,339 +730,263 @@ async function loadAccounts(){
     url += params.join('&');
     const r = await authFetch(api(url));
     const j = await r.json();
-    document.getElementById('accountCount').textContent = `(${j.count})`;
+    document.getElementById('accountCount').textContent = j.count;
     renderAccounts(j.accounts);
-  } catch(e){
-    alert('加载账户失败：' + e);
+    // 自动刷新用量
+    if (autoRefreshUsage && j.accounts?.length > 0) {
+      loadAllUsage();
+    }
+  } catch(e) {
+    alert('加载账号失败: ' + e);
   }
 }
 
-async function createAccount(){
+async function createAccount() {
   const body = {
     label: document.getElementById('new_label').value.trim() || null,
     clientId: document.getElementById('new_clientId').value.trim(),
     clientSecret: document.getElementById('new_clientSecret').value.trim(),
     refreshToken: document.getElementById('new_refreshToken').value.trim() || null,
     accessToken: document.getElementById('new_accessToken').value.trim() || null,
-    enabled: document.getElementById('new_enabled').checked,
-    other: (()=>{
-      const t = document.getElementById('new_other').value.trim();
-      if (!t) return null;
-      try { return JSON.parse(t); } catch { alert('other 不是合法 JSON'); throw new Error('bad other'); }
-    })()
+    enabled: document.getElementById('new_enabled').checked
   };
-  try{
+  if (!body.clientId || !body.clientSecret) {
+    alert('Client ID 和 Client Secret 为必填项');
+    return;
+  }
+  try {
     const r = await authFetch(api('/v2/accounts'), {
-      method:'POST',
-      headers:{ 'content-type':'application/json' },
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body)
     });
-    if (!r.ok) {
-      const t = await r.text();
-      throw new Error(t);
-    }
+    if (!r.ok) throw new Error(await r.text());
+    hideAddAccountModal();
     await loadAccounts();
-  } catch(e){
-    alert('创建失败：' + e);
+  } catch(e) {
+    alert('创建失败: ' + e);
   }
 }
 
-async function deleteAccount(id){
-  if (!confirm('确认删除该账号？')) return;
-  try{
-    const r = await authFetch(api('/v2/accounts/' + encodeURIComponent(id)), { method:'DELETE' });
-    if (!r.ok) { throw new Error(await r.text()); }
-    await loadAccounts();
-  } catch(e){
-    alert('删除失败：' + e);
+async function deleteAccount(id) {
+  if (!confirm('确定要删除这个账号吗？')) return;
+  try {
+    const r = await authFetch(api('/v2/accounts/' + encodeURIComponent(id)), { method: 'DELETE' });
+    if (!r.ok) throw new Error(await r.text());
+    await loadAccounts(false);
+  } catch(e) {
+    alert('删除失败: ' + e);
   }
 }
 
-async function updateAccount(id, patch){
-  try{
+async function updateAccount(id, patch) {
+  try {
     const r = await authFetch(api('/v2/accounts/' + encodeURIComponent(id)), {
-      method:'PATCH',
-      headers:{ 'content-type':'application/json' },
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify(patch)
     });
-    if (!r.ok) { throw new Error(await r.text()); }
-    await loadAccounts();
-  } catch(e){
-    alert('更新失败：' + e);
-  }
-}
-
-async function refreshAccount(id){
-  try{
-    const r = await authFetch(api('/v2/accounts/' + encodeURIComponent(id) + '/refresh'), { method:'POST' });
-    if (!r.ok) { throw new Error(await r.text()); }
-    await loadAccounts();
-  } catch(e){
-    alert('刷新失败：' + e);
-  }
-}
-
-// 使用量查询
-let usageModal = null;
-
-// 单个账号使用量查询
-async function querySingleUsage(accountId, label) {
-  try {
-    const r = await authFetch(api('/v2/accounts/' + encodeURIComponent(accountId) + '/usage'));
-    if (!r.ok) { throw new Error(await r.text()); }
-    const data = await r.json();
-    // 包装成与批量查询相同的格式
-    showUsageModal({
-      results: [data],
-      total: 1,
-      success_count: data.success ? 1 : 0
-    });
+    if (!r.ok) throw new Error(await r.text());
+    await loadAccounts(false);
   } catch(e) {
-    alert('查询使用量失败：' + e);
+    alert('更新失败: ' + e);
   }
 }
 
-async function queryUsage(){
+async function refreshAccount(id) {
+  try {
+    const r = await authFetch(api('/v2/accounts/' + encodeURIComponent(id) + '/refresh'), { method: 'POST' });
+    if (!r.ok) throw new Error(await r.text());
+    await loadAccounts(false);
+  } catch(e) {
+    alert('刷新失败: ' + e);
+  }
+}
+
+let usageCache = {};
+
+function formatUsage(used, limit) {
+  if (limit <= 0) return '-';
+  return `${used.toFixed(1)}/${limit.toFixed(0)}`;
+}
+
+function getUsageFromResult(result) {
+  if (!result.success || !result.usage?.usageBreakdownList) return null;
+  let totalUsed = 0, totalLimit = 0;
+  // 累加所有额度类型
+  for (const b of result.usage.usageBreakdownList) {
+    totalUsed += b.currentUsageWithPrecision ?? b.currentUsage ?? 0;
+    totalLimit += b.usageLimitWithPrecision ?? b.usageLimit ?? 0;
+    // 也累加免费试用额度
+    if (b.freeTrialInfo?.usageLimit > 0) {
+      totalUsed += b.freeTrialInfo.currentUsageWithPrecision ?? b.freeTrialInfo.currentUsage ?? 0;
+      totalLimit += b.freeTrialInfo.usageLimitWithPrecision ?? b.freeTrialInfo.usageLimit ?? 0;
+    }
+  }
+  return { used: totalUsed, limit: totalLimit };
+}
+
+function updateAccountUsage(accountId, usageData) {
+  const el = document.getElementById(`usage-${accountId}`);
+  if (!el) return;
+  if (!usageData) {
+    el.innerHTML = `<span>用量</span><span class="stat-value usage">-</span>`;
+    return;
+  }
+  const pct = usageData.limit > 0 ? Math.round(usageData.used / usageData.limit * 100) : 0;
+  const colorClass = pct > 80 ? 'error' : pct > 50 ? 'usage' : 'success';
+  el.innerHTML = `<span>用量</span><span class="stat-value ${colorClass}">${formatUsage(usageData.used, usageData.limit)} (${pct}%)</span>`;
+}
+
+function updateTotalUsage() {
+  let totalUsed = 0, totalLimit = 0;
+  for (const id in usageCache) {
+    if (usageCache[id]) {
+      totalUsed += usageCache[id].used;
+      totalLimit += usageCache[id].limit;
+    }
+  }
+  const el = document.getElementById('totalUsage');
+  if (totalLimit > 0) {
+    const pct = Math.round(totalUsed / totalLimit * 100);
+    el.textContent = `总用量: ${totalUsed.toFixed(1)}/${totalLimit.toFixed(0)} (${pct}%)`;
+  } else {
+    el.textContent = '总用量: -';
+  }
+}
+
+async function loadAllUsage() {
   const btn = document.getElementById('usageBtn');
   btn.disabled = true;
-  btn.textContent = '查询中...';
+  btn.textContent = '加载中...';
   try {
     const r = await authFetch(api('/v2/accounts/usage'));
-    if (!r.ok) { throw new Error(await r.text()); }
+    if (!r.ok) throw new Error(await r.text());
     const data = await r.json();
-    showUsageModal(data);
+
+    usageCache = {};
+    if (data.results) {
+      for (const result of data.results) {
+        const usage = getUsageFromResult(result);
+        usageCache[result.account_id] = usage;
+        updateAccountUsage(result.account_id, usage);
+      }
+    }
+    updateTotalUsage();
   } catch(e) {
-    alert('查询使用量失败：' + e);
+    console.error('查询用量失败:', e);
   } finally {
     btn.disabled = false;
-    btn.textContent = '查询启用总使用量';
+    btn.textContent = '刷新用量';
   }
 }
 
-function showUsageModal(data) {
-  if (usageModal) usageModal.remove();
+let currentAuth = null;
 
-  const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;';
-
-  // 计算汇总统计
-  let totalCreditUsed = 0, totalCreditLimit = 0;
-  let totalFreeTrialUsed = 0, totalFreeTrialLimit = 0;
-  let hasMultipleAccounts = data.total > 1;
-
-  if (data.results && data.results.length > 0) {
-    for (const r of data.results) {
-      if (r.success && r.usage && r.usage.usageBreakdownList) {
-        for (const b of r.usage.usageBreakdownList) {
-          // 汇总 Credit 使用量
-          const used = b.currentUsageWithPrecision ?? b.currentUsage ?? 0;
-          const limit = b.usageLimitWithPrecision ?? b.usageLimit ?? 0;
-          totalCreditUsed += used;
-          totalCreditLimit += limit;
-          // 汇总免费试用
-          if (b.freeTrialInfo && b.freeTrialInfo.usageLimit > 0) {
-            const ft = b.freeTrialInfo;
-            const ftUsed = ft.currentUsageWithPrecision ?? ft.currentUsage ?? 0;
-            const ftLimit = ft.usageLimitWithPrecision ?? ft.usageLimit ?? 0;
-            totalFreeTrialUsed += ftUsed;
-            totalFreeTrialLimit += ftLimit;
-          }
-        }
-      }
-    }
-  }
-
-  const totalCreditPct = totalCreditLimit > 0 ? Math.round(totalCreditUsed / totalCreditLimit * 100) : 0;
-  const totalCreditColor = totalCreditPct > 80 ? 'var(--danger)' : totalCreditPct > 50 ? 'var(--warn)' : 'var(--ok)';
-  const totalFreeTrialPct = totalFreeTrialLimit > 0 ? Math.round(totalFreeTrialUsed / totalFreeTrialLimit * 100) : 0;
-  const totalFreeTrialColor = totalFreeTrialPct > 80 ? 'var(--danger)' : totalFreeTrialPct > 50 ? 'var(--warn)' : 'var(--ok)';
-
-  let html = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:800px;max-height:80vh;overflow:auto;min-width:400px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h2 style="margin:0;color:#c5d4ff;">使用量查询结果</h2>
-      <button onclick="if(usageModal){usageModal.remove();usageModal=null;}" style="background:transparent;border:none;color:var(--muted);font-size:24px;cursor:pointer;">&times;</button>
-    </div>
-    <div style="color:var(--muted);margin-bottom:16px;">成功: ${data.success_count}/${data.total}</div>`;
-
-  // 显示汇总统计（仅当有多个账号时显示）
-  if (hasMultipleAccounts && totalCreditLimit > 0) {
-    html += `<div style="border:2px solid var(--accent);border-radius:12px;padding:16px;margin-bottom:20px;background:rgba(79,143,255,0.1);">
-      <h3 style="margin:0 0 12px 0;color:var(--accent);font-size:16px;">启用账号总使用量汇总</h3>
-      <div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text);margin-bottom:4px;">
-          <span>Credit 总使用量</span>
-          <span>${totalCreditUsed.toFixed(2)}/${totalCreditLimit.toFixed(2)} (${totalCreditPct}%)</span>
-        </div>
-        <div style="background:var(--border);border-radius:6px;height:10px;">
-          <div style="background:${totalCreditColor};height:100%;border-radius:6px;width:${totalCreditPct}%;transition:width 0.3s;"></div>
-        </div>
-      </div>`;
-
-    if (totalFreeTrialLimit > 0) {
-      html += `<div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text);margin-bottom:4px;">
-          <span>免费试用总使用量</span>
-          <span>${totalFreeTrialUsed.toFixed(2)}/${totalFreeTrialLimit.toFixed(2)} (${totalFreeTrialPct}%)</span>
-        </div>
-        <div style="background:var(--border);border-radius:6px;height:10px;">
-          <div style="background:${totalFreeTrialColor};height:100%;border-radius:6px;width:${totalFreeTrialPct}%;transition:width 0.3s;"></div>
-        </div>
-      </div>`;
-    }
-    html += `</div>`;
-  }
-
-  if (data.results && data.results.length > 0) {
-    for (const r of data.results) {
-      const label = r.label || r.account_id.slice(0,8);
-      const statusColor = r.success ? 'var(--ok)' : 'var(--danger)';
-      html += `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;background:rgba(12,19,34,0.6);">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-weight:600;color:var(--text);">${label}</span>
-          <span style="color:${statusColor};font-size:12px;">${r.success ? '成功' : r.error || '失败'}</span>
-        </div>`;
-
-      if (r.success && r.usage) {
-        const u = r.usage;
-        // 显示用户信息
-        if (u.userInfo?.email) {
-          html += `<div style="color:var(--muted);font-size:12px;margin-top:8px;">邮箱: ${u.userInfo.email}</div>`;
-        }
-        // 显示订阅信息
-        if (u.subscriptionInfo?.subscriptionTitle) {
-          html += `<div style="color:var(--accent);font-size:12px;">订阅: ${u.subscriptionInfo.subscriptionTitle}</div>`;
-        }
-        // 显示使用量明细
-        if (u.usageBreakdownList && u.usageBreakdownList.length > 0) {
-          for (const b of u.usageBreakdownList) {
-            const used = b.currentUsageWithPrecision ?? b.currentUsage ?? 0;
-            const limit = b.usageLimitWithPrecision ?? b.usageLimit ?? 0;
-            const pct = limit > 0 ? Math.round(used / limit * 100) : 0;
-            const barColor = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warn)' : 'var(--ok)';
-            // 格式化重置时间
-            let resetTimeStr = '';
-            if (b.nextDateReset) {
-              const resetDate = new Date(b.nextDateReset * 1000);
-              resetTimeStr = resetDate.toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-            }
-            html += `<div style="margin-top:8px;">
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text);">
-                <span>${b.displayName || b.resourceType}</span>
-                <span>${used}/${limit} (${pct}%)${resetTimeStr ? ' 重置:'+resetTimeStr : ''}</span>
-              </div>
-              <div style="background:var(--border);border-radius:4px;height:6px;margin-top:4px;">
-                <div style="background:${barColor};height:100%;border-radius:4px;width:${pct}%;"></div>
-              </div>
-            </div>`;
-            // 显示赠送积分(bonuses)
-            if (b.bonuses && b.bonuses.length > 0) {
-              for (const bonus of b.bonuses) {
-                const bUsed = bonus.currentUsage ?? 0;
-                const bLimit = bonus.usageLimit ?? 0;
-                const bPct = bLimit > 0 ? Math.round(bUsed / bLimit * 100) : 0;
-                const bColor = bPct > 80 ? 'var(--danger)' : bPct > 50 ? 'var(--warn)' : 'var(--ok)';
-                let expireStr = '';
-                if (bonus.expiresAt) {
-                  const expDate = new Date(bonus.expiresAt * 1000);
-                  expireStr = expDate.toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-                }
-                html += `<div style="margin-top:6px;margin-left:12px;padding:6px;background:rgba(99,102,241,0.1);border-radius:6px;">
-                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--accent);">
-                    <span>🎁 ${bonus.displayName || bonus.bonusCode || '赠送'}</span>
-                    <span>${bUsed}/${bLimit}${expireStr ? ' 过期:'+expireStr : ''}</span>
-                  </div>
-                  <div style="background:var(--border);border-radius:3px;height:4px;margin-top:3px;">
-                    <div style="background:${bColor};height:100%;border-radius:3px;width:${bPct}%;"></div>
-                  </div>
-                </div>`;
-              }
-            }
-            // 显示免费试用
-            if (b.freeTrialInfo && b.freeTrialInfo.usageLimit > 0) {
-              const ft = b.freeTrialInfo;
-              const ftUsed = ft.currentUsageWithPrecision ?? ft.currentUsage ?? 0;
-              const ftLimit = ft.usageLimitWithPrecision ?? ft.usageLimit ?? 0;
-              const ftPct = ftLimit > 0 ? Math.round(ftUsed / ftLimit * 100) : 0;
-              const ftColor = ftPct > 80 ? 'var(--danger)' : ftPct > 50 ? 'var(--warn)' : 'var(--ok)';
-              let ftExpire = '';
-              if (ft.freeTrialExpiry) {
-                const ftDate = new Date(ft.freeTrialExpiry * 1000);
-                ftExpire = ftDate.toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-              }
-              html += `<div style="margin-top:8px;">
-                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text);">
-                  <span>🆓 免费试用 (${ft.freeTrialStatus || ''})</span>
-                  <span>${ftUsed}/${ftLimit} (${ftPct}%)${ftExpire ? ' 过期:'+ftExpire : ''}</span>
-                </div>
-                <div style="background:var(--border);border-radius:4px;height:6px;margin-top:4px;">
-                  <div style="background:${ftColor};height:100%;border-radius:4px;width:${ftPct}%;"></div>
-                </div>
-              </div>`;
-            }
-          }
-        }
-      }
-      html += '</div>';
-    }
-  } else {
-    html += '<div style="color:var(--muted);">暂无数据</div>';
-  }
-
-  html += '</div>';
-  modal.innerHTML = html;
-  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-  document.body.appendChild(modal);
-  usageModal = modal;
+function showAddAccountModal() {
+  document.getElementById('addAccountModal').style.display = 'flex';
+  // 清空表单
+  document.getElementById('new_label').value = '';
+  document.getElementById('new_clientId').value = '';
+  document.getElementById('new_clientSecret').value = '';
+  document.getElementById('new_refreshToken').value = '';
+  document.getElementById('new_accessToken').value = '';
+  document.getElementById('new_enabled').checked = true;
+  document.getElementById('importTokenFile').value = '';
+  document.getElementById('importClientFile').value = '';
 }
 
- // URL Login (Device Authorization)
- let currentAuth = null;
- async function startAuth(){
-   const body = {
-     label: (document.getElementById('auth_label').value || '').trim() || null,
-     enabled: document.getElementById('auth_enabled').checked
-   };
-   try {
-     const r = await authFetch(api('/v2/auth/start'), {
-       method: 'POST',
-       headers: { 'content-type': 'application/json' },
-       body: JSON.stringify(body)
-     });
-     if (!r.ok) throw new Error(await r.text());
-     const j = await r.json();
-     currentAuth = j;
-     const info = [
-       '验证链接: ' + j.verificationUriComplete,
-       '用户代码: ' + (j.userCode || ''),
-       'authId: ' + j.authId,
-       'expiresIn: ' + j.expiresIn + 's',
-       'interval: ' + j.interval + 's'
-     ].join('\\n');
-     const el = document.getElementById('auth_info');
-     el.textContent = info + '\\n\\n请在新窗口中打开上述链接完成登录。';
-     try { window.open(j.verificationUriComplete, '_blank'); } catch {}
-   } catch(e){
-     document.getElementById('auth_info').textContent = '启动失败：' + e;
-   }
- }
+function hideAddAccountModal() {
+  document.getElementById('addAccountModal').style.display = 'none';
+}
 
- async function claimAuth(){
-   if (!currentAuth || !currentAuth.authId) {
-     document.getElementById('auth_info').textContent = '请先点击“开始登录”。';
-     return;
-   }
-   document.getElementById('auth_info').textContent += '\\n\\n正在等待授权并创建账号（最多5分钟）...';
-   try{
-     const r = await authFetch(api('/v2/auth/claim/' + encodeURIComponent(currentAuth.authId)), { method: 'POST' });
-     const text = await r.text();
-     let j;
-     try { j = JSON.parse(text); } catch { j = { raw: text }; }
-     document.getElementById('auth_info').textContent = '完成：\\n' + JSON.stringify(j, null, 2);
-     await loadAccounts();
-   } catch(e){
-     document.getElementById('auth_info').textContent += '\\n失败：' + e;
-   }
- }
+// 点击遮罩层关闭弹窗
+document.addEventListener('click', function(e) {
+  const modal = document.getElementById('addAccountModal');
+  if (e.target === modal) {
+    hideAddAccountModal();
+  }
+});
+
+function parseTokenFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.accessToken) {
+        document.getElementById('new_accessToken').value = data.accessToken;
+      }
+      if (data.refreshToken) {
+        document.getElementById('new_refreshToken').value = data.refreshToken;
+      }
+    } catch (err) {
+      alert('解析 Token 文件失败: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseClientFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.clientId) {
+        document.getElementById('new_clientId').value = data.clientId;
+      }
+      if (data.clientSecret) {
+        document.getElementById('new_clientSecret').value = data.clientSecret;
+      }
+    } catch (err) {
+      alert('解析 Client 文件失败: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function startAuth() {
+  const body = {
+    label: (document.getElementById('auth_label').value || '').trim() || null,
+    enabled: document.getElementById('auth_enabled').checked
+  };
+  try {
+    const r = await authFetch(api('/v2/auth/start'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const j = await r.json();
+    currentAuth = j;
+    document.getElementById('auth_info').textContent =
+      `验证链接: ${j.verificationUriComplete}\n用户代码: ${j.userCode || ''}\n授权ID: ${j.authId}\n有效期: ${j.expiresIn}秒\n\n请在新窗口打开上述链接完成登录。`;
+    try { window.open(j.verificationUriComplete, '_blank'); } catch {}
+  } catch(e) {
+    document.getElementById('auth_info').textContent = '启动失败: ' + e;
+  }
+}
+
+async function claimAuth() {
+  if (!currentAuth?.authId) {
+    document.getElementById('auth_info').textContent = '请先点击"开始登录"。';
+    return;
+  }
+  document.getElementById('auth_info').textContent += '\n\n正在等待授权（最多5分钟）...';
+  try {
+    const r = await authFetch(api('/v2/auth/claim/' + encodeURIComponent(currentAuth.authId)), { method: 'POST' });
+    const text = await r.text();
+    let j;
+    try { j = JSON.parse(text); } catch { j = { raw: text }; }
+    document.getElementById('auth_info').textContent = '完成:\n' + JSON.stringify(j, null, 2);
+    await loadAccounts();
+  } catch(e) {
+    document.getElementById('auth_info').textContent += '\n失败: ' + e;
+  }
+}
 
 async function send() {
   const model = document.getElementById('model').value.trim();
@@ -1008,44 +996,33 @@ async function send() {
 
   let messages;
   try { messages = JSON.parse(document.getElementById('messages').value); }
-  catch(e){ out.textContent = 'messages 不是合法 JSON'; return; }
+  catch(e) { out.textContent = '消息不是有效的 JSON'; return; }
 
   const body = { model, messages, stream };
   const headers = { 'content-type': 'application/json' };
 
   if (!stream) {
-    const r = await authFetch(api('/v1/chat/completions'), {
-      method:'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
+    const r = await authFetch(api('/v1/chat/completions'), { method: 'POST', headers, body: JSON.stringify(body) });
     const text = await r.text();
     try { out.textContent = JSON.stringify(JSON.parse(text), null, 2); }
     catch { out.textContent = text; }
   } else {
-    const r = await authFetch(api('/v1/chat/completions'), {
-      method:'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
+    const r = await authFetch(api('/v1/chat/completions'), { method: 'POST', headers, body: JSON.stringify(body) });
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
     while (true) {
-      const {value, done} = await reader.read();
+      const { value, done } = await reader.read();
       if (done) break;
-      out.textContent += decoder.decode(value, {stream:true});
+      out.textContent += decoder.decode(value, { stream: true });
     }
   }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Check authentication first
-  const password = getAuthPassword();
-  if (!password) {
+  if (!getAuthPassword()) {
     window.location.href = '/login';
     return;
   }
-  // Only load accounts if authenticated
   loadAccounts();
 });
 </script>

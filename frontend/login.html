@@ -3,143 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Q2API</title>
+    <title>登录 - Q2API</title>
     <style>
         :root {
-            --bg:#0a0e1a;
-            --panel:#0f1420;
-            --muted:#8b95a8;
-            --text:#e8f0ff;
-            --accent:#4f8fff;
-            --danger:#ff4757;
-            --border:#1a2332;
-            --glow:rgba(79,143,255,.15);
+            --background: 0 0% 3.9%;
+            --foreground: 0 0% 98%;
+            --card: 0 0% 3.9%;
+            --card-foreground: 0 0% 98%;
+            --primary: 0 0% 98%;
+            --primary-foreground: 0 0% 9%;
+            --secondary: 0 0% 14.9%;
+            --muted: 0 0% 14.9%;
+            --muted-foreground: 0 0% 63.9%;
+            --destructive: 0 62.8% 30.6%;
+            --border: 0 0% 14.9%;
+            --input: 0 0% 14.9%;
+            --ring: 0 0% 83.1%;
+            --radius: 0.5rem;
         }
-        * { box-sizing:border-box; }
-        html, body { height:100%; margin:0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background:radial-gradient(ellipse at top, #0f1624 0%, #0a0e1a 100%);
-            color:var(--text);
-            font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Hiragino Sans GB,Microsoft YaHei,Noto Sans,Arial,sans-serif;
-            line-height:1.6;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            min-height:100vh;
-            padding:20px;
+            min-height: 100vh;
+            background: hsl(var(--background));
+            color: hsl(var(--foreground));
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            -webkit-font-smoothing: antialiased;
         }
-        .container {
-            width:100%;
-            max-width:420px;
+        .container { width: 100%; max-width: 400px; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            background: hsl(var(--foreground));
+            border-radius: 12px;
+            margin-bottom: 1rem;
         }
-        .header {
-            text-align:center;
-            margin-bottom:32px;
+        .logo svg { width: 24px; height: 24px; }
+        .logo svg circle, .logo svg path { stroke: hsl(var(--background)); }
+        .logo svg text { fill: hsl(var(--background)); }
+        h1 { font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em; margin-bottom: 0.5rem; }
+        .subtitle { color: hsl(var(--muted-foreground)); font-size: 0.875rem; }
+        .card {
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 1.5rem;
         }
-        h1 {
-            font-size:32px;
-            font-weight:700;
-            margin:0 0 8px;
-            background:linear-gradient(135deg,#4f8fff,#7b9fff);
-            -webkit-background-clip:text;
-            -webkit-text-fill-color:transparent;
-            background-clip:text;
-        }
-        .subtitle {
-            color:var(--muted);
-            font-size:14px;
-        }
-        .panel {
-            background:linear-gradient(145deg,rgba(15,20,32,.8),rgba(10,14,26,.9));
-            border:1px solid var(--border);
-            border-radius:16px;
-            padding:32px;
-            box-shadow:0 20px 60px rgba(0,0,0,.4),0 0 0 1px rgba(79,143,255,.08),inset 0 1px 0 rgba(255,255,255,.03);
-            backdrop-filter:blur(12px);
-        }
-        .field {
-            margin-bottom:24px;
-        }
+        .field { margin-bottom: 1.5rem; }
         label {
-            display:block;
-            color:var(--muted);
-            font-size:13px;
-            font-weight:500;
-            margin-bottom:8px;
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: hsl(var(--foreground));
         }
         input {
-            width:100%;
-            background:rgba(12,16,28,.6);
-            color:var(--text);
-            border:1px solid var(--border);
-            border-radius:12px;
-            padding:12px 14px;
-            outline:none;
-            transition:all .2s;
-            font-size:14px;
-            box-shadow:inset 0 1px 2px rgba(0,0,0,.2);
+            width: 100%;
+            height: 2.5rem;
+            padding: 0 0.75rem;
+            font-size: 0.875rem;
+            background: transparent;
+            border: 1px solid hsl(var(--input));
+            border-radius: calc(var(--radius) - 2px);
+            color: hsl(var(--foreground));
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
         }
+        input::placeholder { color: hsl(var(--muted-foreground)); }
         input:focus {
-            border-color:var(--accent);
-            box-shadow:0 0 0 3px var(--glow),inset 0 1px 2px rgba(0,0,0,.2);
-            background:rgba(12,16,28,.8);
+            border-color: hsl(var(--ring));
+            box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
         }
         button {
-            width:100%;
-            background:linear-gradient(135deg,#2563eb,#1e40af);
-            color:#fff;
-            border:none;
-            border-radius:12px;
-            padding:12px 20px;
-            font-weight:600;
-            font-size:14px;
-            cursor:pointer;
-            transition:all .2s;
-            box-shadow:0 4px 16px rgba(37,99,235,.3),inset 0 1px 0 rgba(255,255,255,.1);
-            position:relative;
-            overflow:hidden;
+            width: 100%;
+            height: 2.5rem;
+            padding: 0 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            border: none;
+            border-radius: calc(var(--radius) - 2px);
+            cursor: pointer;
+            transition: opacity 0.15s;
         }
-        button:before {
-            content:'';
-            position:absolute;
-            top:0;left:0;right:0;bottom:0;
-            background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);
-            opacity:0;
-            transition:opacity .2s;
-        }
-        button:hover {
-            transform:translateY(-1px);
-            box-shadow:0 6px 20px rgba(37,99,235,.4),inset 0 1px 0 rgba(255,255,255,.15);
-        }
-        button:hover:before { opacity:1; }
-        button:active { transform:translateY(0); }
-        button:disabled {
-            opacity:.5;
-            cursor:not-allowed;
-            transform:none;
-        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         @keyframes slide-up {
-            from { transform:translateY(100%); opacity:0; }
-            to { transform:translateY(0); opacity:1; }
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
         .toast {
-            position:fixed;
-            bottom:20px;
-            right:20px;
-            padding:12px 20px;
-            border-radius:12px;
-            color:#fff;
-            font-size:14px;
-            font-weight:500;
-            box-shadow:0 8px 24px rgba(0,0,0,.4);
-            animation:slide-up .3s ease-out;
-            z-index:1000;
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            animation: slide-up 0.3s ease-out;
+            z-index: 1000;
+            border: 1px solid;
         }
         .toast.error {
-            background:linear-gradient(135deg,#dc2626,#991b1b);
+            background: hsl(0 62.8% 30.6% / 0.1);
+            border-color: hsl(0 62.8% 30.6%);
+            color: hsl(0 62.8% 50%);
         }
         .toast.success {
-            background:linear-gradient(135deg,#16a34a,#15803d);
+            background: hsl(142 76% 36% / 0.1);
+            border-color: hsl(142 76% 36%);
+            color: hsl(142 76% 46%);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: hsl(var(--muted-foreground));
+            font-size: 0.75rem;
         }
     </style>
 </head>
@@ -147,56 +134,64 @@
     <div class="container">
         <div class="header">
             <h1>Q2API</h1>
-            <p class="subtitle">Admin Console</p>
         </div>
-        <div class="panel">
+        <div class="card">
             <form id="loginForm">
                 <div class="field">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required placeholder="Enter password" autofocus>
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" required placeholder="请输入管理密码" autofocus>
                 </div>
-                <button type="submit" id="loginButton">Login</button>
+                <button type="submit" id="loginButton">登 录</button>
             </form>
+        </div>
+        <div class="footer">
+            Powered by Amazon Q
         </div>
     </div>
 
     <script>
-        const form=document.getElementById('loginForm'),btn=document.getElementById('loginButton');
-        form.addEventListener('submit',async(e)=>{
+        const form = document.getElementById('loginForm');
+        const btn = document.getElementById('loginButton');
+
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            btn.disabled=true;
-            btn.textContent='Logging in...';
-            try{
-                const fd=new FormData(form),r=await fetch('/api/login',{
-                    method:'POST',
-                    headers:{'Content-Type':'application/json'},
-                    body:JSON.stringify({password:fd.get('password')})
+            btn.disabled = true;
+            btn.textContent = '登录中...';
+
+            try {
+                const fd = new FormData(form);
+                const r = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: fd.get('password') })
                 });
-                const d=await r.json();
-                if(d.success){
-                    localStorage.setItem('adminPassword',fd.get('password'));
-                    location.href='/';
-                }else{
-                    showToast(d.message||'Login failed','error');
+                const d = await r.json();
+
+                if (d.success) {
+                    localStorage.setItem('adminPassword', fd.get('password'));
+                    location.href = '/';
+                } else {
+                    showToast(d.message || '登录失败', 'error');
                 }
-            }catch(e){
-                showToast('Network error, please try again','error');
-            }finally{
-                btn.disabled=false;
-                btn.textContent='Login';
+            } catch (e) {
+                showToast('网络错误，请重试', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '登 录';
             }
         });
 
-        function showToast(m,t='error'){
-            const d=document.createElement('div');
-            d.className='toast '+t;
-            d.textContent=m;
-            document.body.appendChild(d);
-            setTimeout(()=>{
-                d.style.opacity='0';
-                d.style.transition='opacity .3s';
-                setTimeout(()=>d.parentNode&&document.body.removeChild(d),300)
-            },2000);
+        function showToast(msg, type = 'error') {
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
     </script>
 </body>

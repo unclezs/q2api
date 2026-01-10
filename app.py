@@ -163,10 +163,10 @@ async def _init_global_client():
     )
     # 为流式响应设置更长的超时
     timeout = httpx.Timeout(
-        connect=1.0,  # 连接超时
+        connect=30.0,  # 连接超时（包括 TLS 握手）
         read=300.0,    # 读取超时(流式响应需要更长时间)
-        write=1.0,    # 写入超时
-        pool=1.0      # 从连接池获取连接的超时时间(关键!)
+        write=30.0,    # 写入超时
+        pool=10.0      # 从连接池获取连接的超时时间
     )
     GLOBAL_CLIENT = httpx.AsyncClient(mounts=mounts, timeout=timeout, limits=limits)
 
@@ -398,11 +398,19 @@ class AccountUpdate(BaseModel):
 class ChatMessage(BaseModel):
     role: str
     content: Any
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+    tool_call_id: Optional[str] = None
 
 class ChatCompletionRequest(BaseModel):
     model: Optional[str] = None
     messages: List[ChatMessage]
     stream: Optional[bool] = False
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    tools: Optional[List[Dict[str, Any]]] = None
+    tool_choice: Optional[Any] = None
+    user: Optional[str] = None
 
 # ------------------------------------------------------------------------------
 # Token refresh (OIDC)
@@ -869,121 +877,430 @@ async def count_tokens_endpoint(req: ClaudeRequest):
     return {"input_tokens": input_tokens}
 
 @app.post("/v1/chat/completions")
-async def chat_completions(req: ChatCompletionRequest, account: Dict[str, Any] = Depends(require_account)):
+async def chat_completions(
+    req: ChatCompletionRequest,
+    authorization: Optional[str] = Header(default=None),
+    x_api_key: Optional[str] = Header(default=None)
+):
     """
     OpenAI-compatible chat endpoint.
-    - stream default False
-    - messages will be converted into "{role}:\n{content}" and injected into template
-    - account is chosen randomly among enabled accounts (API key is for authorization only)
+    将 OpenAI 格式转换为 Claude 格式，通过现有的 Claude 处理流程处理请求。
     """
-    model = map_model_name(req.model)
-    do_stream = bool(req.stream)
+    # 动态导入转换模块
+    from openai_converter import convert_openai_to_claude, apply_model_mapping, MODEL_MAPPING, MAX_TOKENS_MAPPING
+    from openai_stream import OpenAIStreamHandler, convert_claude_response_to_openai
 
-    async def _send_upstream(stream: bool) -> Tuple[Optional[str], Optional[AsyncGenerator[str, None]], Any]:
-        access = account.get("accessToken")
-        if not access:
-            refreshed = await refresh_access_token_in_db(account["id"])
-            access = refreshed.get("accessToken")
-            if not access:
-                raise HTTPException(status_code=502, detail="Access token unavailable after refresh")
-        # Note: send_chat_request signature changed, but we use keyword args so it should be fine if we don't pass raw_payload
-        # But wait, the return signature changed too! It now returns 4 values.
-        # We need to unpack 4 values.
-        result = await send_chat_request(access, [m.model_dump() for m in req.messages], model=model, stream=stream, client=GLOBAL_CLIENT)
-        return result[0], result[1], result[2] # Ignore the 4th value (event_stream) for OpenAI endpoint
+    # 提取 API Key
+    bearer_key = _extract_bearer(authorization) if authorization else x_api_key
 
-    if not do_stream:
+    # 构建 OpenAI 请求数据
+    openai_req = {
+        "model": req.model or "",
+        "messages": [m.model_dump() for m in req.messages],
+        "stream": bool(req.stream),
+    }
+    if req.max_tokens is not None:
+        openai_req["max_tokens"] = req.max_tokens
+    if req.temperature is not None:
+        openai_req["temperature"] = req.temperature
+    if req.top_p is not None:
+        openai_req["top_p"] = req.top_p
+    if req.tools:
+        openai_req["tools"] = req.tools
+    if req.tool_choice is not None:
+        openai_req["tool_choice"] = req.tool_choice
+    if req.user:
+        openai_req["user"] = req.user
+
+    # 应用模型映射
+    original_model = openai_req["model"]
+    openai_req["model"] = apply_model_mapping(original_model)
+    if openai_req["model"] != original_model:
+        import logging
+        logging.getLogger(__name__).info(f"Model mapped: {original_model} -> {openai_req['model']}")
+
+    # 转换 OpenAI 请求为 Claude 格式
+    try:
+        claude_req_dict = convert_openai_to_claude(
+            openai_req,
+            max_tokens_mapping=MAX_TOKENS_MAPPING,
+            api_key=bearer_key or ""
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Request conversion failed: {str(e)}")
+
+    # 构建 ClaudeRequest 对象
+    claude_req = ClaudeRequest(
+        model=claude_req_dict.get("model", ""),
+        max_tokens=claude_req_dict.get("max_tokens", 8192),
+        messages=[_claude_types.ClaudeMessage(**m) for m in claude_req_dict.get("messages", [])],
+        system=claude_req_dict.get("system"),
+        temperature=claude_req_dict.get("temperature"),
+        top_p=claude_req_dict.get("top_p"),
+        stream=bool(req.stream),
+        tools=[_claude_types.ClaudeTool(**t) for t in claude_req_dict.get("tools", [])] if claude_req_dict.get("tools") else None,
+        tool_choice=claude_req_dict.get("tool_choice"),
+        metadata=claude_req_dict.get("metadata")
+    )
+
+    # 转换请求为 Amazon Q 格式
+    try:
+        aq_request = convert_claude_to_amazonq_request(claude_req, conversation_id=None)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Claude to AmazonQ conversion failed: {str(e)}")
+
+    # Post-process history to fix message ordering
+    from message_processor import process_claude_history_for_amazonq
+    conversation_state = aq_request.get("conversationState", {})
+    history = conversation_state.get("history", [])
+    if history:
+        processed_history = process_claude_history_for_amazonq(history)
+        aq_request["conversationState"]["history"] = processed_history
+
+    # 计算输入 tokens
+    text_to_count = ""
+    if claude_req.system:
+        if isinstance(claude_req.system, str):
+            text_to_count += claude_req.system
+        elif isinstance(claude_req.system, list):
+            for item in claude_req.system:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_to_count += item.get("text", "")
+    for msg in claude_req.messages:
+        if isinstance(msg.content, str):
+            text_to_count += msg.content
+        elif isinstance(msg.content, list):
+            for item in msg.content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_to_count += item.get("text", "")
+    input_tokens = count_tokens(text_to_count, apply_multiplier=True)
+
+    # 重试循环
+    tried_account_ids: List[str] = []
+    last_error: Optional[Exception] = None
+    max_attempts = MAX_RETRY_COUNT + 1
+
+    for attempt in range(max_attempts):
+        event_iter = None
+        account = None
         try:
-            # Calculate prompt tokens
-            prompt_text = "".join([m.content for m in req.messages if isinstance(m.content, str)])
-            prompt_tokens = count_tokens(prompt_text)
-
-            text, _, tracker = await _send_upstream(stream=False)
-            await _update_stats(account["id"], bool(text))
-            
-            completion_tokens = count_tokens(text or "")
-            
-            return JSONResponse(content=_openai_non_streaming_response(
-                text or "",
-                model,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens
-            ))
-        except Exception as e:
-            await _update_stats(account["id"], False)
-            raise
-    else:
-        created = int(time.time())
-        stream_id = f"chatcmpl-{uuid.uuid4()}"
-        model_used = model or "unknown"
-        
-        it = None
-        try:
-            # Calculate prompt tokens
-            prompt_text = "".join([m.content for m in req.messages if isinstance(m.content, str)])
-            prompt_tokens = count_tokens(prompt_text)
-
-            _, it, tracker = await _send_upstream(stream=True)
-            assert it is not None
-            
-            async def event_gen() -> AsyncGenerator[str, None]:
-                completion_text = ""
-                try:
-                    # Send role first
-                    yield _sse_format({
-                        "id": stream_id,
-                        "object": "chat.completion.chunk",
-                        "created": created,
-                        "model": model_used,
-                        "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
-                    })
-                    
-                    # Stream content
-                    async for piece in it:
-                        if piece:
-                            completion_text += piece
-                            yield _sse_format({
-                                "id": stream_id,
-                                "object": "chat.completion.chunk",
-                                "created": created,
-                                "model": model_used,
-                                "choices": [{"index": 0, "delta": {"content": piece}, "finish_reason": None}],
-                            })
-                    
-                    # Send stop and usage
-                    completion_tokens = count_tokens(completion_text)
-                    yield _sse_format({
-                        "id": stream_id,
-                        "object": "chat.completion.chunk",
-                        "created": created,
-                        "model": model_used,
-                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                        "usage": {
-                            "prompt_tokens": prompt_tokens,
-                            "completion_tokens": completion_tokens,
-                            "total_tokens": prompt_tokens + completion_tokens,
-                        }
-                    })
-                    
-                    yield "data: [DONE]\n\n"
-                    await _update_stats(account["id"], True)
-                except GeneratorExit:
-                    # Client disconnected - update stats but don't re-raise
-                    await _update_stats(account["id"], tracker.has_content if tracker else False)
-                except Exception:
-                    await _update_stats(account["id"], tracker.has_content if tracker else False)
-                    raise
-            
-            return StreamingResponse(event_gen(), media_type="text/event-stream")
-        except Exception as e:
-            # Ensure iterator (if created) is closed to release upstream connection
+            # 获取账户
             try:
-                if it and hasattr(it, "aclose"):
-                    await it.aclose()
-            except Exception:
-                pass
-            await _update_stats(account["id"], False)
+                account = await resolve_account_for_key(bearer_key, exclude_ids=tried_account_ids if tried_account_ids else None)
+            except HTTPException as he:
+                if "No enabled account available" in str(he.detail) and tried_account_ids:
+                    tried_account_ids = []
+                    account = await resolve_account_for_key(bearer_key, exclude_ids=None)
+                else:
+                    raise
+            tried_account_ids.append(account["id"])
+
+            access = account.get("accessToken")
+            if not access:
+                refreshed = await refresh_access_token_in_db(account["id"])
+                access = refreshed.get("accessToken")
+
+            # 发送请求
+            _, _, tracker, event_iter = await send_chat_request(
+                access_token=access,
+                messages=[],
+                model=map_model_name(claude_req.model),
+                stream=True,
+                client=GLOBAL_CLIENT,
+                raw_payload=aq_request
+            )
+
+            if not event_iter:
+                raise Exception("No event stream returned")
+
+            # 尝试获取第一个事件以确保连接有效
+            first_event = None
+            try:
+                first_event = await event_iter.__anext__()
+            except StopAsyncIteration:
+                raise Exception("Empty response from upstream")
+
+            # 成功！创建处理器并返回响应
+            current_account = account
+            current_tracker = tracker
+
+            if req.stream:
+                # 流式响应 - 使用 OpenAI 流式处理器
+                openai_handler = OpenAIStreamHandler(model=req.model or claude_req.model)
+
+                async def event_generator():
+                    try:
+                        # 确保先发送 role
+                        if not openai_handler.sent_role:
+                            openai_handler.sent_role = True
+                            yield openai_handler._format_sse(openai_handler._create_chunk({
+                                "role": "assistant",
+                                "content": ""
+                            }))
+
+                        if first_event:
+                            event_type, payload = first_event
+                            async for sse in openai_handler.handle_event(event_type, payload):
+                                yield sse
+                        async for event_type, payload in event_iter:
+                            async for sse in openai_handler.handle_event(event_type, payload):
+                                yield sse
+                        async for sse in openai_handler.finish():
+                            yield sse
+                        await _update_stats(current_account["id"], True)
+                    except GeneratorExit:
+                        await _update_stats(current_account["id"], current_tracker.has_content if current_tracker else False)
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        await _update_stats(current_account["id"], False)
+                        raise
+
+                return StreamingResponse(
+                    event_generator(),
+                    media_type="text/event-stream"
+                )
+            else:
+                # 非流式响应 - 累积所有事件然后转换
+                content_blocks = []
+                usage = {"input_tokens": 0, "output_tokens": 0}
+                stop_reason = None
+                message_id = None
+                role = "assistant"
+
+                # 创建一个简单的 Claude 流处理器来累积响应
+                handler = ClaudeStreamHandler(model=claude_req.model, input_tokens=input_tokens)
+
+                async def accumulate_response():
+                    nonlocal content_blocks, usage, stop_reason, message_id, role
+                    try:
+                        if first_event:
+                            event_type, payload = first_event
+                            async for _ in handler.handle_event(event_type, payload):
+                                pass
+                        async for event_type, payload in event_iter:
+                            if event_type == "message_start":
+                                msg = payload.get("message", {})
+                                message_id = msg.get("id")
+                                role = msg.get("role", "assistant")
+                            async for _ in handler.handle_event(event_type, payload):
+                                pass
+                        async for _ in handler.finish():
+                            pass
+                    except Exception:
+                        pass
+
+                await accumulate_response()
+
+                # 从 handler 构建 Claude 响应
+                claude_response = {
+                    "id": message_id or f"msg_{uuid.uuid4()}",
+                    "type": "message",
+                    "role": role,
+                    "model": claude_req.model,
+                    "content": handler.get_content_blocks() if hasattr(handler, 'get_content_blocks') else [],
+                    "stop_reason": handler.stop_reason if hasattr(handler, 'stop_reason') else "end_turn",
+                    "usage": {
+                        "input_tokens": handler.usage.get("input_tokens", input_tokens) if hasattr(handler, 'usage') else input_tokens,
+                        "output_tokens": handler.usage.get("output_tokens", 0) if hasattr(handler, 'usage') else 0
+                    }
+                }
+
+                # 如果 handler 没有 get_content_blocks 方法，从 response_buffer 构建
+                if not hasattr(handler, 'get_content_blocks'):
+                    text_content = handler.response_buffer if hasattr(handler, 'response_buffer') else ""
+                    claude_response["content"] = [{"type": "text", "text": text_content}] if text_content else []
+
+                # 转换为 OpenAI 格式
+                openai_response = convert_claude_response_to_openai(claude_response, model=req.model or claude_req.model)
+                await _update_stats(current_account["id"], True)
+                return JSONResponse(content=openai_response)
+
+        except HTTPException:
+            if account:
+                await _update_stats(account["id"], False)
             raise
+        except Exception as e:
+            if event_iter and hasattr(event_iter, "aclose"):
+                try:
+                    await event_iter.aclose()
+                except Exception:
+                    pass
+            if account:
+                await _update_stats(account["id"], False)
+
+            # 检查不可重试的错误
+            error_str = str(e)
+            if "CONTENT_LENGTH_EXCEEDS_THRESHOLD" in error_str or "Input is too long" in error_str:
+                raise HTTPException(status_code=400, detail="Input is too long. Please reduce the context length.")
+
+            last_error = e
+            traceback.print_exc()  # 打印详细堆栈
+
+            if attempt < max_attempts - 1:
+                import logging
+                wait_time = min(3 * (2 ** attempt), 30)
+                logging.getLogger(__name__).warning(f"Request failed (attempt {attempt + 1}/{max_attempts}), retrying in {wait_time}s: {str(e)}")
+                await asyncio.sleep(wait_time)
+                continue
+            else:
+                raise HTTPException(status_code=502, detail=f"All {max_attempts} attempts failed. Last error: {str(last_error)}")
+
+# ------------------------------------------------------------------------------
+# OpenAI Models API
+# ------------------------------------------------------------------------------
+
+AVAILABLE_MODELS = [
+    {
+        "id": "claude-opus-4-5-20251101",
+        "object": "model",
+        "created": 1730419200,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 16384,
+    },
+    {
+        "id": "claude-sonnet-4-5-20251101",
+        "object": "model",
+        "created": 1730419200,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 8192,
+    },
+    {
+        "id": "claude-3-5-sonnet-20241022",
+        "object": "model",
+        "created": 1729555200,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 8192,
+    },
+    {
+        "id": "claude-3-5-haiku-20241022",
+        "object": "model",
+        "created": 1729555200,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 4096,
+    },
+    {
+        "id": "claude-3-opus-20240229",
+        "object": "model",
+        "created": 1709164800,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 4096,
+    },
+    {
+        "id": "claude-3-sonnet-20240229",
+        "object": "model",
+        "created": 1709164800,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 4096,
+    },
+    {
+        "id": "claude-3-haiku-20240307",
+        "object": "model",
+        "created": 1709769600,
+        "owned_by": "anthropic",
+        "context_window": 200000,
+        "max_output_tokens": 4096,
+    },
+]
+
+@app.get("/v1/models")
+async def list_models():
+    """
+    OpenAI-compatible models list endpoint.
+    Returns available Claude models with context window information.
+    Also includes mapped models from OPENAI_MODEL_MAPPING.
+    """
+    from openai_converter import parse_model_mapping
+
+    # 每次请求时重新解析环境变量，确保获取最新配置
+    model_mapping = parse_model_mapping(os.getenv("OPENAI_MODEL_MAPPING", ""))
+
+    # 构建模型 ID 到模型信息的映射
+    model_info_map = {m["id"]: m for m in AVAILABLE_MODELS}
+
+    # 收集所有模型
+    all_models = list(AVAILABLE_MODELS)
+
+    # 添加映射的模型（克隆目标模型的信息，但使用映射的名称）
+    for source_model, target_model in model_mapping.items():
+        if source_model not in model_info_map:
+            # 找到目标模型的信息
+            target_info = model_info_map.get(target_model)
+            if target_info:
+                # 克隆目标模型信息，但使用源模型名称
+                mapped_model = {
+                    "id": source_model,
+                    "object": "model",
+                    "created": target_info.get("created", int(time.time())),
+                    "owned_by": target_info.get("owned_by", "anthropic"),
+                    "context_window": target_info.get("context_window", 200000),
+                    "max_output_tokens": target_info.get("max_output_tokens", 8192),
+                }
+                all_models.append(mapped_model)
+            else:
+                # 目标模型不在列表中，使用默认值
+                mapped_model = {
+                    "id": source_model,
+                    "object": "model",
+                    "created": int(time.time()),
+                    "owned_by": "anthropic",
+                    "context_window": 200000,
+                    "max_output_tokens": 8192,
+                }
+                all_models.append(mapped_model)
+
+    return {
+        "object": "list",
+        "data": all_models
+    }
+
+@app.get("/v1/models/{model_id}")
+async def get_model(model_id: str):
+    """
+    OpenAI-compatible model detail endpoint.
+    """
+    from openai_converter import parse_model_mapping
+
+    # 每次请求时重新解析环境变量
+    model_mapping = parse_model_mapping(os.getenv("OPENAI_MODEL_MAPPING", ""))
+
+    # 先查找原始模型
+    for model in AVAILABLE_MODELS:
+        if model["id"] == model_id:
+            return model
+
+    # 查找映射模型
+    if model_id in model_mapping:
+        target_model = model_mapping[model_id]
+        for model in AVAILABLE_MODELS:
+            if model["id"] == target_model:
+                return {
+                    "id": model_id,
+                    "object": "model",
+                    "created": model.get("created", int(time.time())),
+                    "owned_by": model.get("owned_by", "anthropic"),
+                    "context_window": model.get("context_window", 200000),
+                    "max_output_tokens": model.get("max_output_tokens", 8192),
+                }
+        # 目标模型不在列表中，使用默认值
+        return {
+            "id": model_id,
+            "object": "model",
+            "created": int(time.time()),
+            "owned_by": "anthropic",
+            "context_window": 200000,
+            "max_output_tokens": 8192,
+        }
+
+    raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
 
 # ------------------------------------------------------------------------------
 # Device Authorization (URL Login, 5-minute timeout)

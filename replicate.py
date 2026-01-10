@@ -259,15 +259,29 @@ async def send_chat_request(
     
     # Use manual request sending to control stream lifetime
     req = client.build_request("POST", url, headers=headers, content=payload_str)
-    
+
+    # 调试日志（受 DEBUG_OPENAI_STREAM 环境变量控制）
+    if os.getenv("DEBUG_OPENAI_STREAM", "").lower() in ("true", "1", "yes"):
+        print(f"\n{'='*60}")
+        print(f"[REQUEST] URL: {url}")
+        print(f"[REQUEST] Headers: {json.dumps({k: v[:50] + '...' if len(str(v)) > 50 else v for k, v in headers.items()}, indent=2, ensure_ascii=False)}")
+        print(f"[REQUEST] Body (truncated): {payload_str[:1000]}...")
+        print(f"{'='*60}\n")
+
     resp = None
     try:
         resp = await client.send(req, stream=True)
-        
+
+        # 调试日志
+        if os.getenv("DEBUG_OPENAI_STREAM", "").lower() in ("true", "1", "yes"):
+            print(f"[RESPONSE] Status: {resp.status_code}")
+            print(f"[RESPONSE] Headers: {dict(resp.headers)}")
+
         if resp.status_code >= 400:
             try:
                 await resp.aread()
                 err = resp.text
+                print(f"[RESPONSE] Error Body: {err}")
             except Exception:
                 err = f"HTTP {resp.status_code}"
             await resp.aclose()
