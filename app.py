@@ -590,6 +590,55 @@ def _openai_non_streaming_response(
 def _sse_format(obj: Dict[str, Any]) -> str:
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
+
+def _trim_context_by_tokens(messages: List, trim_tokens: int = 10000) -> List:
+    """
+    从消息历史中截断指定数量的 tokens。
+    优先从旧消息开始截断，保留最近的系统提示和用户消息。
+    """
+    if trim_tokens <= 0 or not messages or not ENCODING:
+        return messages
+
+    # 计算当前总 tokens
+    def count_msg_tokens(msg):
+        if isinstance(msg, str):
+            return len(ENCODING.encode(msg))
+        elif isinstance(msg, dict):
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                return len(ENCODING.encode(content))
+            elif isinstance(content, list):
+                tokens = 0
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        tokens += len(ENCODING.encode(item.get("text", "")))
+                return tokens
+        return 0
+
+    # 优先截断 history 中的旧消息
+    # aq_request["conversationState"]["history"] 是需要处理的主要对象
+    total_trimmed = 0
+    remaining_to_trim = trim_tokens
+
+    # 从开头开始删除历史消息，直到达到目标截断量
+    while remaining_to_trim > 0 and len(messages) > 1:
+        # 跳过保留的消息数量（如最后几条重要的对话）
+        keep_count = 2  # 保留最后2条消息
+        if len(messages) <= keep_count:
+            break
+
+        # 删除最旧的消息
+        removed = messages.pop(0)
+        removed_tokens = count_msg_tokens(removed)
+        remaining_to_trim -= removed_tokens
+        total_trimmed += removed_tokens
+
+    import logging
+    logging.getLogger(__name__).info(f"Trimmed ~{total_trimmed} tokens from context, {len(messages)} messages remain")
+
+    return messages
+
+
 @app.post("/v1/messages")
 async def claude_messages(
     req: ClaudeRequest,
@@ -599,6 +648,7 @@ async def claude_messages(
 ):
     """
     Claude-compatible messages endpoint with retry support.
+    Includes automatic context truncation on "Input is too long" errors.
     """
     # Extract bearer key for authorization
     bearer_key = _extract_bearer(authorization) if authorization else x_api_key
@@ -658,10 +708,13 @@ async def claude_messages(
                     text_to_count += item.get("text", "")
     input_tokens = count_tokens(text_to_count, apply_multiplier=True)
 
-    # Retry loop with exponential backoff
+    # Retry loop with exponential backoff and context truncation
     tried_account_ids: List[str] = []
     last_error: Optional[Exception] = None
     max_attempts = MAX_RETRY_COUNT + 1  # +1 for initial attempt
+    trim_retry_count = 0  # 跟踪上下文截断重试次数
+    max_trim_retries = 3  # 最多截断重试3次
+    trim_tokens_per_retry = 10000  # 每次截断10k tokens
 
     for attempt in range(max_attempts):
         event_iter = None
@@ -821,10 +874,31 @@ async def claude_messages(
             if account:
                 await _update_stats(account["id"], False)
 
-            # Check for non-retryable errors
+            # Check for context too long errors - apply automatic truncation
             error_str = str(e)
             if "CONTENT_LENGTH_EXCEEDS_THRESHOLD" in error_str or "Input is too long" in error_str:
-                raise HTTPException(status_code=400, detail="Input is too long. Please reduce the context length.")
+                if trim_retry_count < max_trim_retries:
+                    # 自动截断上下文并重试
+                    trim_retry_count += 1
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"Context too long (trim retry {trim_retry_count}/{max_trim_retries}), "
+                        f"truncating {trim_tokens_per_retry} tokens and retrying..."
+                    )
+                    # 重置账户重试计数，因为这是上下文问题不是账户问题
+                    tried_account_ids = []
+                    # 截断 aq_request 中的 history
+                    history = aq_request.get("conversationState", {}).get("history", [])
+                    if history:
+                        aq_request["conversationState"]["history"] = _trim_context_by_tokens(history, trim_tokens_per_retry)
+                    continue
+                else:
+                    # 超过最大截断重试次数
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Input is too long even after {max_trim_retries} truncation attempts. "
+                               f"Please significantly reduce the context length."
+                    )
 
             last_error = e
 
@@ -981,6 +1055,9 @@ async def chat_completions(
     tried_account_ids: List[str] = []
     last_error: Optional[Exception] = None
     max_attempts = MAX_RETRY_COUNT + 1
+    trim_retry_count = 0  # 跟踪上下文截断重试次数
+    max_trim_retries = 3  # 最多截断重试3次
+    trim_tokens_per_retry = 10000  # 每次截断10k tokens
 
     for attempt in range(max_attempts):
         event_iter = None
@@ -1134,7 +1211,28 @@ async def chat_completions(
             # 检查不可重试的错误
             error_str = str(e)
             if "CONTENT_LENGTH_EXCEEDS_THRESHOLD" in error_str or "Input is too long" in error_str:
-                raise HTTPException(status_code=400, detail="Input is too long. Please reduce the context length.")
+                if trim_retry_count < max_trim_retries:
+                    # 自动截断上下文并重试
+                    trim_retry_count += 1
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"Context too long (trim retry {trim_retry_count}/{max_trim_retries}), "
+                        f"truncating {trim_tokens_per_retry} tokens and retrying..."
+                    )
+                    # 重置账户重试计数，因为这是上下文问题不是账户问题
+                    tried_account_ids = []
+                    # 截断 aq_request 中的 history
+                    history = aq_request.get("conversationState", {}).get("history", [])
+                    if history:
+                        aq_request["conversationState"]["history"] = _trim_context_by_tokens(history, trim_tokens_per_retry)
+                    continue
+                else:
+                    # 超过最大截断重试次数
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Input is too long even after {max_trim_retries} truncation attempts. "
+                               f"Please significantly reduce the context length."
+                    )
 
             last_error = e
             traceback.print_exc()  # 打印详细堆栈
