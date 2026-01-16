@@ -594,44 +594,74 @@ def _sse_format(obj: Dict[str, Any]) -> str:
 def _trim_context_by_tokens(messages: List, trim_tokens: int = 10000) -> List:
     """
     从消息历史中截断指定数量的 tokens。
-    优先从旧消息开始截断，保留最近的系统提示和用户消息。
+    优先从旧消息开始截断，保留最近的对话轮次。
+
+    重要：删除完整的对话轮次（user + assistant 成对），保持消息交替结构。
     """
     if trim_tokens <= 0 or not messages or not ENCODING:
         return messages
 
-    # 计算当前总 tokens
+    # 计算消息的 tokens（考虑 Amazon Q 的消息格式）
     def count_msg_tokens(msg):
         if isinstance(msg, str):
             return len(ENCODING.encode(msg))
         elif isinstance(msg, dict):
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                return len(ENCODING.encode(content))
-            elif isinstance(content, list):
-                tokens = 0
-                for item in content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        tokens += len(ENCODING.encode(item.get("text", "")))
-                return tokens
+            # Amazon Q 格式：userInputMessage 或 assistantResponseMessage
+            if "userInputMessage" in msg:
+                content = msg["userInputMessage"].get("content", "")
+                if isinstance(content, str):
+                    return len(ENCODING.encode(content))
+                elif isinstance(content, list):
+                    tokens = 0
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            tokens += len(ENCODING.encode(item.get("text", "")))
+                    return tokens
+            elif "assistantResponseMessage" in msg:
+                content = msg["assistantResponseMessage"].get("content", "")
+                if isinstance(content, str):
+                    return len(ENCODING.encode(content))
+                elif isinstance(content, list):
+                    tokens = 0
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            tokens += len(ENCODING.encode(item.get("text", "")))
+                    return tokens
         return 0
 
     # 优先截断 history 中的旧消息
-    # aq_request["conversationState"]["history"] 是需要处理的主要对象
     total_trimmed = 0
     remaining_to_trim = trim_tokens
 
-    # 从开头开始删除历史消息，直到达到目标截断量
-    while remaining_to_trim > 0 and len(messages) > 1:
-        # 跳过保留的消息数量（如最后几条重要的对话）
-        keep_count = 2  # 保留最后2条消息
-        if len(messages) <= keep_count:
+    # 从开头开始删除完整的对话轮次（user + assistant 成对）
+    # 保持消息交替结构：user-assistant-user-assistant...
+    while remaining_to_trim > 0 and len(messages) >= 2:
+        # 保留最后至少2条消息（1个完整轮次）
+        if len(messages) <= 2:
             break
 
-        # 删除最旧的消息
-        removed = messages.pop(0)
-        removed_tokens = count_msg_tokens(removed)
-        remaining_to_trim -= removed_tokens
-        total_trimmed += removed_tokens
+        # 删除最旧的一轮对话（第一条 user + 第一条 assistant）
+        # 假设历史是交替的：user, assistant, user, assistant, ...
+        first_msg = messages[0]
+        if "userInputMessage" in first_msg:
+            # 删除 user 消息
+            user_removed = messages.pop(0)
+            user_tokens = count_msg_tokens(user_removed)
+            total_trimmed += user_tokens
+            remaining_to_trim -= user_tokens
+
+            # 如果还有消息且是 assistant，也删除以保持轮次完整
+            if len(messages) > 2 and "assistantResponseMessage" in messages[0]:
+                assistant_removed = messages.pop(0)
+                assistant_tokens = count_msg_tokens(assistant_removed)
+                total_trimmed += assistant_tokens
+                remaining_to_trim -= assistant_tokens
+        else:
+            # 如果第一条不是 user，直接删除（边界情况）
+            removed = messages.pop(0)
+            removed_tokens = count_msg_tokens(removed)
+            total_trimmed += removed_tokens
+            remaining_to_trim -= removed_tokens
 
     import logging
     logging.getLogger(__name__).info(f"Trimmed ~{total_trimmed} tokens from context, {len(messages)} messages remain")
