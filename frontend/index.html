@@ -527,6 +527,15 @@
               <input type="file" id="importClientFile" accept=".json" onchange="parseClientFile(this)">
             </div>
           </div>
+          <div class="form-divider"><span>或粘贴 JSON</span></div>
+          <div class="form-group">
+            <label class="file-label">支持直接粘贴包含 credentials 的账号 JSON，解析后自动填充</label>
+            <textarea id="importJsonText" placeholder='粘贴 JSON，例如：{"credentials":{"clientId":"...","clientSecret":"...","refreshToken":"...","accessToken":"..."}}'></textarea>
+            <div class="flex items-center gap-2 mt-2">
+              <button class="btn btn-secondary btn-sm" onclick="parsePastedAccountJson()">解析粘贴 JSON</button>
+              <span id="importJsonStatus" class="text-xs text-muted"></span>
+            </div>
+          </div>
         </div>
         <div class="form-divider"><span>或手动填写</span></div>
         <div class="form-group mb-2">
@@ -596,6 +605,97 @@ async function authFetch(url, options = {}) {
 }
 
 let accountsData = [];
+let importedAccountOther = null;
+
+function getCredentialSource(data) {
+  if (data && typeof data === 'object' && data.credentials && typeof data.credentials === 'object') {
+    return data.credentials;
+  }
+  return (data && typeof data === 'object') ? data : {};
+}
+
+function toTrimmedString(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function parseAccountFromJsonObject(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('JSON 顶层必须是对象');
+  }
+
+  const creds = getCredentialSource(data);
+  const parsed = {
+    label: toTrimmedString(data.label || creds.label),
+    clientId: toTrimmedString(creds.clientId || data.clientId),
+    clientSecret: toTrimmedString(creds.clientSecret || data.clientSecret),
+    refreshToken: toTrimmedString(creds.refreshToken || data.refreshToken),
+    accessToken: toTrimmedString(creds.accessToken || data.accessToken),
+    other: null
+  };
+
+  const importedMeta = {};
+  if (typeof data.success === 'boolean') importedMeta.success = data.success;
+  if (typeof data.licenseExpiresAt === 'string') importedMeta.licenseExpiresAt = data.licenseExpiresAt;
+  if (typeof data.boundDevices === 'number') importedMeta.boundDevices = data.boundDevices;
+
+  const credentialsMeta = {};
+  for (const key of ['expiresAt', 'region', 'startUrl', 'provider', 'profileArn']) {
+    if (typeof creds[key] === 'string' && creds[key].trim()) {
+      credentialsMeta[key] = creds[key];
+    }
+  }
+  if (Object.keys(credentialsMeta).length > 0) {
+    importedMeta.credentials = credentialsMeta;
+  }
+  if (Object.keys(importedMeta).length > 0) {
+    parsed.other = { imported: importedMeta };
+  }
+
+  return parsed;
+}
+
+function applyParsedAccountData(parsed) {
+  if (parsed.label) {
+    document.getElementById('new_label').value = parsed.label;
+  }
+  if (parsed.clientId) {
+    document.getElementById('new_clientId').value = parsed.clientId;
+  }
+  if (parsed.clientSecret) {
+    document.getElementById('new_clientSecret').value = parsed.clientSecret;
+  }
+  if (parsed.refreshToken) {
+    document.getElementById('new_refreshToken').value = parsed.refreshToken;
+  }
+  if (parsed.accessToken) {
+    document.getElementById('new_accessToken').value = parsed.accessToken;
+  }
+  importedAccountOther = parsed.other;
+}
+
+function parsePastedAccountJson() {
+  const statusEl = document.getElementById('importJsonStatus');
+  const raw = document.getElementById('importJsonText').value.trim();
+  if (!raw) {
+    statusEl.textContent = '请先粘贴 JSON';
+    importedAccountOther = null;
+    return;
+  }
+
+  try {
+    const parsed = parseAccountFromJsonObject(JSON.parse(raw));
+    applyParsedAccountData(parsed);
+
+    if (!parsed.clientId || !parsed.clientSecret) {
+      statusEl.textContent = '已解析，但缺少 clientId 或 clientSecret';
+      return;
+    }
+    statusEl.textContent = '解析成功，已自动填充，可直接创建';
+  } catch (err) {
+    importedAccountOther = null;
+    statusEl.textContent = '解析失败: ' + err.message;
+  }
+}
 
 function createAccountCard(acc) {
   const card = document.createElement('div');
@@ -748,6 +848,7 @@ async function createAccount() {
     clientSecret: document.getElementById('new_clientSecret').value.trim(),
     refreshToken: document.getElementById('new_refreshToken').value.trim() || null,
     accessToken: document.getElementById('new_accessToken').value.trim() || null,
+    other: importedAccountOther,
     enabled: document.getElementById('new_enabled').checked
   };
   if (!body.clientId || !body.clientSecret) {
@@ -886,6 +987,7 @@ let currentAuth = null;
 function showAddAccountModal() {
   document.getElementById('addAccountModal').style.display = 'flex';
   // 清空表单
+  importedAccountOther = null;
   document.getElementById('new_label').value = '';
   document.getElementById('new_clientId').value = '';
   document.getElementById('new_clientSecret').value = '';
@@ -894,6 +996,8 @@ function showAddAccountModal() {
   document.getElementById('new_enabled').checked = true;
   document.getElementById('importTokenFile').value = '';
   document.getElementById('importClientFile').value = '';
+  document.getElementById('importJsonText').value = '';
+  document.getElementById('importJsonStatus').textContent = '';
 }
 
 function hideAddAccountModal() {
@@ -915,11 +1019,12 @@ function parseTokenFile(input) {
   reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.accessToken) {
-        document.getElementById('new_accessToken').value = data.accessToken;
+      const creds = getCredentialSource(data);
+      if (creds.accessToken || data.accessToken) {
+        document.getElementById('new_accessToken').value = creds.accessToken || data.accessToken;
       }
-      if (data.refreshToken) {
-        document.getElementById('new_refreshToken').value = data.refreshToken;
+      if (creds.refreshToken || data.refreshToken) {
+        document.getElementById('new_refreshToken').value = creds.refreshToken || data.refreshToken;
       }
     } catch (err) {
       alert('解析 Token 文件失败: ' + err.message);
@@ -935,11 +1040,12 @@ function parseClientFile(input) {
   reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.clientId) {
-        document.getElementById('new_clientId').value = data.clientId;
+      const creds = getCredentialSource(data);
+      if (creds.clientId || data.clientId) {
+        document.getElementById('new_clientId').value = creds.clientId || data.clientId;
       }
-      if (data.clientSecret) {
-        document.getElementById('new_clientSecret').value = data.clientSecret;
+      if (creds.clientSecret || data.clientSecret) {
+        document.getElementById('new_clientSecret').value = creds.clientSecret || data.clientSecret;
       }
     } catch (err) {
       alert('解析 Client 文件失败: ' + err.message);

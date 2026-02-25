@@ -9,7 +9,7 @@ import random
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional, List, Any, AsyncGenerator, Tuple
+from typing import Dict, Optional, List, Any, AsyncGenerator, Tuple, Union
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -386,6 +386,15 @@ class AccountCreate(BaseModel):
 class BatchAccountCreate(BaseModel):
     accounts: List[AccountCreate]
 
+class AccountCreateFromCredentials(BaseModel):
+    label: Optional[str] = None
+    enabled: Optional[bool] = True
+    other: Optional[Dict[str, Any]] = None
+    success: Optional[bool] = None
+    licenseExpiresAt: Optional[str] = None
+    boundDevices: Optional[int] = None
+    credentials: Dict[str, Any]
+
 class AccountUpdate(BaseModel):
     label: Optional[str] = None
     clientId: Optional[str] = None
@@ -394,6 +403,50 @@ class AccountUpdate(BaseModel):
     accessToken: Optional[str] = None
     other: Optional[Dict[str, Any]] = None
     enabled: Optional[bool] = None
+
+def _normalize_account_create_body(body: Union[AccountCreate, AccountCreateFromCredentials]) -> AccountCreate:
+    if isinstance(body, AccountCreate):
+        return body
+
+    creds = body.credentials or {}
+    client_id = str(creds.get("clientId") or "").strip()
+    client_secret = str(creds.get("clientSecret") or "").strip()
+    refresh_token = creds.get("refreshToken")
+    access_token = creds.get("accessToken")
+
+    if refresh_token is not None and not isinstance(refresh_token, str):
+        refresh_token = str(refresh_token)
+    if access_token is not None and not isinstance(access_token, str):
+        access_token = str(access_token)
+
+    merged_other = dict(body.other or {})
+    imported_meta: Dict[str, Any] = {}
+    if body.success is not None:
+        imported_meta["success"] = body.success
+    if body.licenseExpiresAt:
+        imported_meta["licenseExpiresAt"] = body.licenseExpiresAt
+    if body.boundDevices is not None:
+        imported_meta["boundDevices"] = body.boundDevices
+
+    credentials_meta: Dict[str, Any] = {}
+    for key in ("expiresAt", "region", "startUrl", "provider", "profileArn"):
+        value = creds.get(key)
+        if isinstance(value, str) and value.strip():
+            credentials_meta[key] = value
+    if credentials_meta:
+        imported_meta["credentials"] = credentials_meta
+    if imported_meta:
+        merged_other["imported"] = imported_meta
+
+    return AccountCreate(
+        label=body.label,
+        clientId=client_id,
+        clientSecret=client_secret,
+        refreshToken=refresh_token,
+        accessToken=access_token,
+        other=merged_other or None,
+        enabled=body.enabled,
+    )
 
 class ChatMessage(BaseModel):
     role: str
@@ -1536,11 +1589,15 @@ if CONSOLE_ENABLED:
     # ------------------------------------------------------------------------------
 
     @app.post("/v2/accounts")
-    async def create_account(body: AccountCreate, _: bool = Depends(verify_admin_password)):
+    async def create_account(body: Union[AccountCreate, AccountCreateFromCredentials], _: bool = Depends(verify_admin_password)):
+        normalized = _normalize_account_create_body(body)
+        if not normalized.clientId or not normalized.clientSecret:
+            raise HTTPException(status_code=400, detail="clientId and clientSecret are required")
+
         now = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
         acc_id = str(uuid.uuid4())
-        other_str = json.dumps(body.other, ensure_ascii=False) if body.other is not None else None
-        enabled_val = 1 if (body.enabled is None or body.enabled) else 0
+        other_str = json.dumps(normalized.other, ensure_ascii=False) if normalized.other is not None else None
+        enabled_val = 1 if (normalized.enabled is None or normalized.enabled) else 0
         await _db.execute(
             """
             INSERT INTO accounts (id, label, clientId, clientSecret, refreshToken, accessToken, other, last_refresh_time, last_refresh_status, created_at, updated_at, enabled)
@@ -1548,11 +1605,11 @@ if CONSOLE_ENABLED:
             """,
             (
                 acc_id,
-                body.label,
-                body.clientId,
-                body.clientSecret,
-                body.refreshToken,
-                body.accessToken,
+                normalized.label,
+                normalized.clientId,
+                normalized.clientSecret,
+                normalized.refreshToken,
+                normalized.accessToken,
                 other_str,
                 None,
                 "never",
